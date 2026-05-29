@@ -1,0 +1,135 @@
+# task <task-name>
+#
+# Ops cheatsheet for raf-banka. Validates manifests locally, drives image
+# pushes (until CI handles them), and wraps the common kubectl/argocd
+# interactions you reach for during sync iteration.
+
+version: "3"
+
+vars:
+  REGISTRY: registry.urosevicvuk.dev
+  PROJECT: raf-banka3
+  TAG: main
+  NAMESPACE: raf-banka
+  APP: raf-banka
+  BACKEND_DIR: "../Banka-3-Backend"
+  FRONTEND_DIR: "../Banka-3-Frontend"
+  SERVICES: user bank trading exchange notification gateway
+
+tasks:
+  default:
+    desc: List all tasks
+    cmds:
+      - task --list
+
+  # ----------------------------------------------------------------
+  # Manifest validation — runs without touching the cluster
+  # ----------------------------------------------------------------
+
+  render:
+    desc: Render the kustomization to /tmp/raf-banka.yaml for inspection
+    cmds:
+      - kustomize build . > /tmp/raf-banka.yaml
+      - 'echo "rendered $(grep -c ''^kind:'' /tmp/raf-banka.yaml) resources to /tmp/raf-banka.yaml"'
+
+  validate:
+    desc: kustomize build + kubeconform schema check (CNPG, ESO, Gateway API, Cilium)
+    cmds:
+      - |
+        kustomize build . | kubeconform \
+          -strict -summary \
+          -kubernetes-version 1.31.0 \
+          -schema-location default \
+          -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{`{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}`}}.json'
+
+  # ----------------------------------------------------------------
+  # Image push — bootstrap path while CI is being fixed.
+  # Drop these tasks once GH Actions reliably builds + pushes on push to main.
+  # ----------------------------------------------------------------
+
+  proto:
+    desc: Regenerate proto stubs in Banka-3-Backend (required before push:backend)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - make proto
+
+  push:backend:
+    desc: Build + push the 6 backend service images
+    deps: [proto]
+    cmds:
+      - for: { var: SERVICES }
+        cmd: |
+          docker build -f {{.BACKEND_DIR}}/docker/Dockerfile \
+            --build-arg SERVICE={{.ITEM}} \
+            -t {{.REGISTRY}}/{{.PROJECT}}/{{.ITEM}}:{{.TAG}} \
+            {{.BACKEND_DIR}}
+          docker push {{.REGISTRY}}/{{.PROJECT}}/{{.ITEM}}:{{.TAG}}
+
+  push:migrate:
+    desc: Build + push the migration runner image
+    cmds:
+      - |
+        docker build -f {{.BACKEND_DIR}}/docker/Dockerfile.migrate \
+          -t {{.REGISTRY}}/{{.PROJECT}}/migrate:{{.TAG}} \
+          {{.BACKEND_DIR}}
+        docker push {{.REGISTRY}}/{{.PROJECT}}/migrate:{{.TAG}}
+
+  push:frontend:
+    desc: Build + push the frontend image
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - |
+        docker build \
+          -t {{.REGISTRY}}/{{.PROJECT}}/frontend:{{.TAG}} \
+          .
+        docker push {{.REGISTRY}}/{{.PROJECT}}/frontend:{{.TAG}}
+
+  push:all:
+    desc: Build + push every image (backend services + migrate + frontend) — the manual bootstrap
+    cmds:
+      - task: push:backend
+      - task: push:migrate
+      - task: push:frontend
+
+  # ----------------------------------------------------------------
+  # Cluster operations — assume KUBECONFIG already points at firelink
+  # ----------------------------------------------------------------
+
+  sync:
+    desc: Force Argo to sync raf-banka now
+    cmds:
+      - argocd app sync {{.APP}} --core
+
+  status:
+    desc: Show the Argo Application + raf-banka workload state
+    cmds:
+      - argocd app get {{.APP}} --core
+      - kubectl get pods,svc,httproute -n {{.NAMESPACE}}
+
+  logs:
+    desc: 'Tail logs of a deployment. Usage: task logs SERVICE=bank'
+    requires:
+      vars: [SERVICE]
+    cmds:
+      - kubectl logs -n {{.NAMESPACE}} -l app.kubernetes.io/name={{.SERVICE}} --tail=200 -f
+
+  restart:
+    desc: Rollout-restart every deployment in raf-banka
+    cmds:
+      - kubectl rollout restart deployment -n {{.NAMESPACE}}
+
+  psql:
+    desc: Open a psql session against the banka-pg primary
+    cmds:
+      - kubectl exec -it -n {{.NAMESPACE}} banka-pg-1 -- psql -U banka -d banka
+
+  migrate:rerun:
+    desc: Delete the migrate Job and re-sync to re-run it (idempotent — golang-migrate skips applied versions)
+    cmds:
+      - kubectl delete job -n {{.NAMESPACE}} banka-migrate --ignore-not-found
+      - task: sync
+
+  events:
+    desc: Tail the namespace's k8s events sorted by time
+    cmds:
+      - kubectl get events -n {{.NAMESPACE}} --sort-by=.lastTimestamp --watch
