@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: exchange
+    app.kubernetes.io/part-of: banka-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: exchange
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: exchange
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: exchange
+          image: registry.urosevicvuk.dev/raf-banka3/exchange:main
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - { name: grpc,  containerPort: 50051 }
+            - { name: probe, containerPort: 8081 }
+          env:
+            - { name: GRPC_PORT,  value: "50051" }
+            - { name: PROBE_PORT, value: "8081" }
+            - { name: LOG_LEVEL,  value: info }
+            - { name: LOG_FORMAT, value: json }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
+            - { name: FX_FEED_INTERVAL, value: "5m" }
+            - { name: FX_FEED_SPREAD,   value: "0.01" }
+          readinessProbe:
+            httpGet: { path: /readyz, port: probe }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: probe }
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange
+  namespace: raf-banka
+spec:
+  selector:
+    app.kubernetes.io/name: exchange
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+      appProtocol: grpc

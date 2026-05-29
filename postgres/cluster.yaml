@@ -1,0 +1,33 @@
+# CloudNativePG cluster for banka-3. One Postgres, database `banka`,
+# owner role `banka`. The 5 service schemas (user/bank/trading/
+# exchange/notification) are created by the per-service migrations,
+# not in postInitApplicationSQL.
+#
+# CNPG mints a `banka-pg-app` Secret on bootstrap with keys:
+#   username, password, host, port, dbname, uri, jdbc-uri, pgpass
+# We feed `uri` straight into DATABASE_URL on every service.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: banka-pg
+  namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  bootstrap:
+    initdb:
+      database: banka
+      owner: banka
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  monitoring:
+    enablePodMonitor: true
