@@ -53,36 +53,40 @@ tasks:
     cmds:
       - make proto
 
+  # All push tasks use `docker buildx build --push` instead of the legacy
+  # `docker build` + `docker push`. Buildkit's pusher retries dropped blob
+  # chunks; legacy push doesn't. Going through cloudflared, the legacy path
+  # bricks every push >~8MB on a single dropped TLS frame.
+
   push:backend:
     desc: Build + push the 6 backend service images
     deps: [proto]
     cmds:
       - for: { var: SERVICES }
         cmd: |
-          docker build -f {{.BACKEND_DIR}}/docker/Dockerfile \
+          docker buildx build --push --platform linux/amd64 \
+            -f {{.BACKEND_DIR}}/docker/Dockerfile \
             --build-arg SERVICE={{.ITEM}} \
             -t {{.REGISTRY}}/{{.PROJECT}}/{{.ITEM}}:{{.TAG}} \
             {{.BACKEND_DIR}}
-          docker push {{.REGISTRY}}/{{.PROJECT}}/{{.ITEM}}:{{.TAG}}
 
   push:migrate:
     desc: Build + push the migration runner image
     cmds:
       - |
-        docker build -f {{.BACKEND_DIR}}/docker/Dockerfile.migrate \
+        docker buildx build --push --platform linux/amd64 \
+          -f {{.BACKEND_DIR}}/docker/Dockerfile.migrate \
           -t {{.REGISTRY}}/{{.PROJECT}}/migrate:{{.TAG}} \
           {{.BACKEND_DIR}}
-        docker push {{.REGISTRY}}/{{.PROJECT}}/migrate:{{.TAG}}
 
   push:frontend:
     desc: Build + push the frontend image
     dir: "{{.FRONTEND_DIR}}"
     cmds:
       - |
-        docker build \
+        docker buildx build --push --platform linux/amd64 \
           -t {{.REGISTRY}}/{{.PROJECT}}/frontend:{{.TAG}} \
           .
-        docker push {{.REGISTRY}}/{{.PROJECT}}/frontend:{{.TAG}}
 
   push:all:
     desc: Build + push every image (backend services + migrate + frontend) — the manual bootstrap

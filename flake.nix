@@ -33,6 +33,7 @@
             # Misc
             git
             curl
+            go-task
           ];
         };
       };
