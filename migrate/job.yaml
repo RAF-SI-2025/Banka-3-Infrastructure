@@ -9,9 +9,12 @@
 # Sync resource at wave 0, Argo runs us only after wave -10 (ESOs) and
 # wave -5 (CNPG cluster + Redis) report Healthy.
 #
-# `Replace=true` so re-syncs re-create the Job instead of failing on
-# "Job is immutable." `ttlSecondsAfterFinished` cleans up the completed
-# Pod after 10 min.
+# `ttlSecondsAfterFinished` cleans up the completed Pod after 10 min.
+# We deliberately don't set Argo's `Replace=true` sync option — it
+# conflicts with the AppSet-level `ServerSideApply=true` (kubectl rejects
+# `--server-side --force` together). If you ever change the Job spec,
+# manually `kubectl delete job -n raf-banka banka-migrate` once before
+# re-syncing; the new Job materializes fresh.
 #
 # The image baked at build time contains:
 #   /usr/local/bin/migrate
@@ -27,7 +30,6 @@ metadata:
   namespace: raf-banka
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/sync-options: Replace=true
 spec:
   backoffLimit: 3
   ttlSecondsAfterFinished: 600
