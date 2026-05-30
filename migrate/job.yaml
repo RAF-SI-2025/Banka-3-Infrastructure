@@ -1,7 +1,17 @@
-# PreSync hook: walks every service's migrations dir in dependency
-# order (user → exchange → bank → notification → trading) and applies
-# pending migrations against the banka DB. Each run is idempotent —
-# golang-migrate skips already-applied versions per schema.
+# Regular Sync resource at wave 0. Walks every service's migrations dir
+# in dependency order (user → exchange → bank → notification → trading)
+# and applies pending migrations against the banka DB. Each run is
+# idempotent — golang-migrate skips already-applied versions per schema.
+#
+# Was originally a PreSync hook but that race-condition'd: PreSync runs
+# BEFORE the Sync phase, so harbor-pull (ESO) and banka-pg-app (CNPG)
+# don't exist yet → ImagePullBackOff + no DATABASE_URL. As a regular
+# Sync resource at wave 0, Argo runs us only after wave -10 (ESOs) and
+# wave -5 (CNPG cluster + Redis) report Healthy.
+#
+# `Replace=true` so re-syncs re-create the Job instead of failing on
+# "Job is immutable." `ttlSecondsAfterFinished` cleans up the completed
+# Pod after 10 min.
 #
 # The image baked at build time contains:
 #   /usr/local/bin/migrate
@@ -16,8 +26,8 @@ metadata:
   name: banka-migrate
   namespace: raf-banka
   annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Replace=true
 spec:
   backoffLimit: 3
   ttlSecondsAfterFinished: 600

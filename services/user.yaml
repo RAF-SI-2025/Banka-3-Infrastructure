@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: user
   namespace: raf-banka
+  annotations:
+    # Wait for migrate Job (wave 0) before starting; schemas must exist.
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app.kubernetes.io/name: user
     app.kubernetes.io/part-of: banka-3

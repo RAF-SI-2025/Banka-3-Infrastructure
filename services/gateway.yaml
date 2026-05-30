@@ -6,6 +6,8 @@ kind: Deployment
 metadata:
   name: gateway
   namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app.kubernetes.io/name: gateway
     app.kubernetes.io/part-of: banka-3

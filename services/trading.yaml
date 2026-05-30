@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: trading
   namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app.kubernetes.io/name: trading
     app.kubernetes.io/part-of: banka-3
