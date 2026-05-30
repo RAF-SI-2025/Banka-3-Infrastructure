@@ -15,6 +15,9 @@ vars:
   BACKEND_DIR: "../Banka-3-Backend"
   FRONTEND_DIR: "../Banka-3-Frontend"
   SERVICES: user bank trading exchange notification gateway
+  # Every image that gets a cosign signature. SERVICES + migrate + frontend.
+  SIGNED_IMAGES: user bank trading exchange notification gateway migrate frontend
+  COSIGN_KEY_VAULT_PATH: kv/raf-banka/cosign
 
 tasks:
   default:
@@ -89,11 +92,50 @@ tasks:
           .
 
   push:all:
-    desc: Build + push every image (backend services + migrate + frontend) — the manual bootstrap
+    desc: Build + push every image, then cosign-sign each
     cmds:
       - task: push:backend
       - task: push:migrate
       - task: push:frontend
+      - task: sign:all
+
+  # ----------------------------------------------------------------
+  # Signing — cosign sign every published image with the keypair
+  # stored in Vault. Kyverno verifies on the cluster side. See
+  # ykube/apps/system/security/kyverno/policies/verify-banka-images.yaml.
+  # ----------------------------------------------------------------
+
+  sign:all:
+    desc: Cosign-sign every pushed image (fetches private key from Vault — needs VAULT_ADDR + VAULT_TOKEN set)
+    cmds:
+      - |
+        set -e
+        if [[ -z "${VAULT_ADDR:-}" || -z "${VAULT_TOKEN:-}" ]]; then
+          echo "VAULT_ADDR and VAULT_TOKEN must be set (kubectl port-forward to vault:8200 + export the root token)." >&2
+          exit 1
+        fi
+        export COSIGN_PRIVATE_KEY=$(vault kv get -field=private-key {{.COSIGN_KEY_VAULT_PATH}})
+        export COSIGN_PASSWORD=$(vault kv get -field=password {{.COSIGN_KEY_VAULT_PATH}})
+        for img in {{.SIGNED_IMAGES}}; do
+          ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
+          echo "==> signing $ref"
+          # --tlog-upload=false keeps signatures out of the public Rekor
+          # transparency log (this is a private homelab keypair, not a
+          # public-identity flow).
+          cosign sign --key env://COSIGN_PRIVATE_KEY --tlog-upload=false --yes "$ref"
+        done
+
+  verify:all:
+    desc: Locally verify every signed image against the published public key (sanity check)
+    cmds:
+      - |
+        set -e
+        for img in {{.SIGNED_IMAGES}}; do
+          ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
+          echo "==> verifying $ref"
+          cosign verify --key cosign.pub --insecure-ignore-tlog "$ref" >/dev/null
+        done
+        echo "all images verified"
 
   # ----------------------------------------------------------------
   # Cluster operations — assume KUBECONFIG already points at firelink
