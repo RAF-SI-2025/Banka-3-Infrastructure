@@ -44,6 +44,7 @@ spec:
             - { name: LOG_FORMAT, value: json }
             - name: DATABASE_URL
               valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
+            - { name: REDIS_ADDR, value: "redis:6379" }
             - name: SMTP_HOST
               valueFrom: { secretKeyRef: { name: banka-smtp, key: host,     optional: true } }
             - name: SMTP_PORT
