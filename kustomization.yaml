@@ -1,0 +1,24 @@
+# Banka-3 deployment root.
+#
+# Picked up by ykube apps/raf/banka/kustomization.yaml (remote base
+# at ?ref=main). The raf ApplicationSet renders this into a single
+# Argo Application raf-banka deployed into the raf-banka namespace.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: raf-banka
+
+resources:
+  - namespace.yaml
+  - secrets.yaml
+  - postgres/cluster.yaml
+  - redis/redis.yaml
+  - migrate/job.yaml
+  - services/user.yaml
+  - services/bank.yaml
+  - services/trading.yaml
+  - services/exchange.yaml
+  - services/notification.yaml
+  - services/gateway.yaml
+  - frontend/frontend.yaml
+  - httproute.yaml

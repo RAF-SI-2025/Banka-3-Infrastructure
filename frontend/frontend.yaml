@@ -1,0 +1,70 @@
+# Vite-built SPA served by nginx. Image bakes the dist/ output;
+# nginx config inside the image handles SPA fallback and cache headers.
+# Built by Banka-3-Frontend/.github/workflows/build.yml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: banka-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: registry.urosevicvuk.dev/raf-banka3/frontend:main
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - { name: http, containerPort: 8080 }
+          # nginx unprivileged needs a writable cache + run dir.
+          volumeMounts:
+            - { name: nginx-cache, mountPath: /var/cache/nginx }
+            - { name: nginx-run,   mountPath: /var/run }
+            - { name: tmp,         mountPath: /tmp }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+      volumes:
+        - { name: nginx-cache, emptyDir: {} }
+        - { name: nginx-run,   emptyDir: {} }
+        - { name: tmp,         emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: raf-banka
+spec:
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

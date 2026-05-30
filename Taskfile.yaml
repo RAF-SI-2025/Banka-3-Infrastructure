@@ -1,0 +1,181 @@
+# task <task-name>
+#
+# Ops cheatsheet for raf-banka. Validates manifests locally, drives image
+# pushes (until CI handles them), and wraps the common kubectl/argocd
+# interactions you reach for during sync iteration.
+
+version: "3"
+
+vars:
+  REGISTRY: registry.urosevicvuk.dev
+  PROJECT: raf-banka3
+  TAG: main
+  NAMESPACE: raf-banka
+  APP: raf-banka
+  BACKEND_DIR: "../Banka-3-Backend"
+  FRONTEND_DIR: "../Banka-3-Frontend"
+  SERVICES: user bank trading exchange notification gateway
+  # Every image that gets a cosign signature. SERVICES + migrate + frontend.
+  SIGNED_IMAGES: user bank trading exchange notification gateway migrate frontend
+  COSIGN_KEY_VAULT_PATH: kv/raf-banka/cosign
+
+tasks:
+  default:
+    desc: List all tasks
+    cmds:
+      - task --list
+
+  # ----------------------------------------------------------------
+  # Manifest validation — runs without touching the cluster
+  # ----------------------------------------------------------------
+
+  render:
+    desc: Render the kustomization to /tmp/raf-banka.yaml for inspection
+    cmds:
+      - kustomize build . > /tmp/raf-banka.yaml
+      - 'echo "rendered $(grep -c ''^kind:'' /tmp/raf-banka.yaml) resources to /tmp/raf-banka.yaml"'
+
+  validate:
+    desc: kustomize build + kubeconform schema check (CNPG, ESO, Gateway API, Cilium)
+    cmds:
+      - |
+        kustomize build . | kubeconform \
+          -strict -summary \
+          -kubernetes-version 1.31.0 \
+          -schema-location default \
+          -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{`{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}`}}.json'
+
+  # ----------------------------------------------------------------
+  # Image push — bootstrap path while CI is being fixed.
+  # Drop these tasks once GH Actions reliably builds + pushes on push to main.
+  # ----------------------------------------------------------------
+
+  proto:
+    desc: Regenerate proto stubs in Banka-3-Backend (required before push:backend)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - make proto
+
+  # All push tasks use `docker buildx build --push` instead of the legacy
+  # `docker build` + `docker push`. Buildkit's pusher retries dropped blob
+  # chunks; legacy push doesn't. Going through cloudflared, the legacy path
+  # bricks every push >~8MB on a single dropped TLS frame.
+
+  push:backend:
+    desc: Build + push the 6 backend service images
+    deps: [proto]
+    cmds:
+      - for: { var: SERVICES }
+        cmd: |
+          docker buildx build --push --platform linux/amd64 \
+            -f {{.BACKEND_DIR}}/docker/Dockerfile \
+            --build-arg SERVICE={{.ITEM}} \
+            -t {{.REGISTRY}}/{{.PROJECT}}/{{.ITEM}}:{{.TAG}} \
+            {{.BACKEND_DIR}}
+
+  push:migrate:
+    desc: Build + push the migration runner image
+    cmds:
+      - |
+        docker buildx build --push --platform linux/amd64 \
+          -f {{.BACKEND_DIR}}/docker/Dockerfile.migrate \
+          -t {{.REGISTRY}}/{{.PROJECT}}/migrate:{{.TAG}} \
+          {{.BACKEND_DIR}}
+
+  push:frontend:
+    desc: Build + push the frontend image
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - |
+        docker buildx build --push --platform linux/amd64 \
+          -t {{.REGISTRY}}/{{.PROJECT}}/frontend:{{.TAG}} \
+          .
+
+  push:all:
+    desc: Build + push every image, then cosign-sign each
+    cmds:
+      - task: push:backend
+      - task: push:migrate
+      - task: push:frontend
+      - task: sign:all
+
+  # ----------------------------------------------------------------
+  # Signing — cosign sign every published image with the keypair
+  # stored in Vault. Kyverno verifies on the cluster side. See
+  # ykube/apps/system/security/kyverno/policies/verify-banka-images.yaml.
+  # ----------------------------------------------------------------
+
+  sign:all:
+    desc: Cosign-sign every pushed image (fetches private key from Vault — needs VAULT_ADDR + VAULT_TOKEN set)
+    cmds:
+      - |
+        set -e
+        if [[ -z "${VAULT_ADDR:-}" || -z "${VAULT_TOKEN:-}" ]]; then
+          echo "VAULT_ADDR and VAULT_TOKEN must be set (kubectl port-forward to vault:8200 + export the root token)." >&2
+          exit 1
+        fi
+        export COSIGN_PRIVATE_KEY=$(vault kv get -field=private-key {{.COSIGN_KEY_VAULT_PATH}})
+        export COSIGN_PASSWORD=$(vault kv get -field=password {{.COSIGN_KEY_VAULT_PATH}})
+        for img in {{.SIGNED_IMAGES}}; do
+          ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
+          echo "==> signing $ref"
+          # --tlog-upload=false keeps signatures out of the public Rekor
+          # transparency log (this is a private homelab keypair, not a
+          # public-identity flow).
+          cosign sign --key env://COSIGN_PRIVATE_KEY --tlog-upload=false --yes "$ref"
+        done
+
+  verify:all:
+    desc: Locally verify every signed image against the published public key (sanity check)
+    cmds:
+      - |
+        set -e
+        for img in {{.SIGNED_IMAGES}}; do
+          ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
+          echo "==> verifying $ref"
+          cosign verify --key cosign.pub --insecure-ignore-tlog "$ref" >/dev/null
+        done
+        echo "all images verified"
+
+  # ----------------------------------------------------------------
+  # Cluster operations — assume KUBECONFIG already points at firelink
+  # ----------------------------------------------------------------
+
+  sync:
+    desc: Force Argo to sync raf-banka now
+    cmds:
+      - argocd app sync {{.APP}} --core
+
+  status:
+    desc: Show the Argo Application + raf-banka workload state
+    cmds:
+      - argocd app get {{.APP}} --core
+      - kubectl get pods,svc,httproute -n {{.NAMESPACE}}
+
+  logs:
+    desc: 'Tail logs of a deployment. Usage: task logs SERVICE=bank'
+    requires:
+      vars: [SERVICE]
+    cmds:
+      - kubectl logs -n {{.NAMESPACE}} -l app.kubernetes.io/name={{.SERVICE}} --tail=200 -f
+
+  restart:
+    desc: Rollout-restart every deployment in raf-banka
+    cmds:
+      - kubectl rollout restart deployment -n {{.NAMESPACE}}
+
+  psql:
+    desc: Open a psql session against the banka-pg primary
+    cmds:
+      - kubectl exec -it -n {{.NAMESPACE}} banka-pg-1 -- psql -U banka -d banka
+
+  migrate:rerun:
+    desc: Delete the migrate Job and re-sync to re-run it (idempotent — golang-migrate skips applied versions)
+    cmds:
+      - kubectl delete job -n {{.NAMESPACE}} banka-migrate --ignore-not-found
+      - task: sync
+
+  events:
+    desc: Tail the namespace's k8s events sorted by time
+    cmds:
+      - kubectl get events -n {{.NAMESPACE}} --sort-by=.lastTimestamp --watch

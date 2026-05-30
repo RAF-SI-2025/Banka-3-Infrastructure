@@ -1,0 +1,91 @@
+# raf-banka namespace + tenant guardrails.
+#
+# The namespace name is fixed by ykube's raf ApplicationSet
+# (apps/raf/banka → Application raf-banka in namespace raf-banka).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: raf-banka
+  labels:
+    app.kubernetes.io/part-of: banka-3
+    tenant: raf
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: raf-banka
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    requests.storage: 50Gi
+    persistentvolumeclaims: "20"
+    pods: "50"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-defaults
+  namespace: raf-banka
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+---
+# Default-deny + explicit-allow. Mirrors the morel tenant baseline:
+# same-ns, DNS, Vault (ESO), gateway, prometheus scrapes, world for SMTP
+# and Harbor pulls.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: tenant-baseline
+  namespace: raf-banka
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": raf-banka
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": envoy-gateway-system
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-prometheus-stack
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": raf-banka
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": vault
+      toPorts:
+        - ports:
+            - port: "8200"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": external-secrets
+    - toEntities:
+        - world   # SMTP, AlphaVantage, Harbor pulls, partner banks

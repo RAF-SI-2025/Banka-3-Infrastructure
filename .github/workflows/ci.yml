@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kustomize
+        run: |
+          sudo rm -f /usr/local/bin/kustomize
+          curl -fsSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" \
+            | sudo bash -s 5.4.3 /usr/local/bin
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: kustomize build
+        run: |
+          mkdir -p /tmp/rendered
+          kustomize build . > /tmp/rendered/all.yaml
+          echo "rendered $(grep -c '^kind:' /tmp/rendered/all.yaml) resources"
+
+      - name: kubeconform
+        # CRDs we use that aren't in the stock k8s schema set:
+        #   - CNPG          (postgresql.cnpg.io/v1 Cluster)
+        #   - ESO           (external-secrets.io/v1 ExternalSecret)
+        #   - Gateway API   (gateway.networking.k8s.io/v1 HTTPRoute)
+        #   - Cilium        (cilium.io/v2 CiliumNetworkPolicy)
+        # datreeio/CRDs-catalog hosts community-maintained schemas for all four.
+        run: |
+          kubeconform \
+            -strict \
+            -summary \
+            -kubernetes-version 1.31.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' \
+            /tmp/rendered/all.yaml

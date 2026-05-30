@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: trading
+    app.kubernetes.io/part-of: banka-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trading
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trading
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: trading
+          image: registry.urosevicvuk.dev/raf-banka3/trading:main
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - { name: grpc,  containerPort: 50051 }
+            - { name: probe, containerPort: 8081 }
+          env:
+            - { name: GRPC_PORT,  value: "50051" }
+            - { name: PROBE_PORT, value: "8081" }
+            - { name: LOG_LEVEL,  value: info }
+            - { name: LOG_FORMAT, value: json }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
+            - { name: REDIS_ADDR,                 value: "redis:6379" }
+            - { name: BANK_GRPC_ADDR,             value: "bank:50051" }
+            - { name: EXCHANGE_GRPC_ADDR,         value: "exchange:50051" }
+            - { name: NOTIFICATION_GRPC_ADDR,     value: "notification:50051" }
+            - { name: EXECUTION_TICK_INTERVAL,    value: "10s" }
+            - { name: MARKET_DATA_REFRESH_INTERVAL, value: "6h" }
+            - { name: MARKET_DATA_PAUSE,          value: "13s" }
+            - { name: STOCK_BIDASK_SPREAD,        value: "0.001" }
+            - { name: SAGA_DEBUG_FAULT_INJECTION, value: "false" }
+            - { name: CLOCK_DEBUG,                value: "false" }
+            - name: ALPHAVANTAGE_API_KEY
+              valueFrom: { secretKeyRef: { name: banka-alphavantage, key: api-key, optional: true } }
+          readinessProbe:
+            httpGet: { path: /readyz, port: probe }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: probe }
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading
+  namespace: raf-banka
+spec:
+  selector:
+    app.kubernetes.io/name: trading
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+      appProtocol: grpc

@@ -1,0 +1,77 @@
+# Only public surface. HTTP/JSON ↔ gRPC fan-out, JWT middleware,
+# Idempotency-Key + X-Verification-* header consumption, interbank
+# inbound API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: banka-3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: registry.urosevicvuk.dev/raf-banka3/gateway:main
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - { name: http,  containerPort: 8080 }
+            - { name: probe, containerPort: 8081 }
+          env:
+            - { name: GATEWAY_HTTP_PORT, value: "8080" }
+            - { name: PROBE_PORT,        value: "8081" }
+            - { name: LOG_LEVEL,         value: info }
+            - { name: LOG_FORMAT,        value: json }
+            - { name: REDIS_ADDR,        value: "redis:6379" }
+            - { name: USER_GRPC_ADDR,         value: "user:50051" }
+            - { name: BANK_GRPC_ADDR,         value: "bank:50051" }
+            - { name: TRADING_GRPC_ADDR,      value: "trading:50051" }
+            - { name: EXCHANGE_GRPC_ADDR,     value: "exchange:50051" }
+            - { name: NOTIFICATION_GRPC_ADDR, value: "notification:50051" }
+            - { name: BANK_ROUTING_NUMBER,    value: "333" }
+            - { name: INTERBANK_ROUTES,       value: "" }
+            - { name: CLOCK_DEBUG,            value: "false" }
+            - name: JWT_SIGNING_KEY
+              valueFrom: { secretKeyRef: { name: banka-auth, key: jwt-signing-key } }
+            - name: INTERBANK_API_KEY
+              valueFrom: { secretKeyRef: { name: banka-interbank, key: api-key } }
+          readinessProbe:
+            httpGet: { path: /readyz, port: probe }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: probe }
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: raf-banka
+spec:
+  selector:
+    app.kubernetes.io/name: gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
