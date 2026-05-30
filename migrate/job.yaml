@@ -50,6 +50,10 @@ spec:
       containers:
         - name: migrate
           image: registry.urosevicvuk.dev/raf-banka3/migrate:main
+          # Always re-pull — :main is a mutable tag and we iterate on the
+          # migrate script during deploy bring-up. Otherwise kubelet keeps
+          # the first cached digest forever (IfNotPresent default).
+          imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
