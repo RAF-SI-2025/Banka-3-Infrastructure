@@ -63,6 +63,12 @@ spec:
     - fromEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": kube-prometheus-stack
+    # CNPG operator scrapes the postgres pod's instance manager (:8000)
+    # for status — without this, Cluster status stays Unknown and Argo
+    # never advances past wave -5.
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": cloudnative-pg
   egress:
     - toEndpoints:
         - matchLabels:
