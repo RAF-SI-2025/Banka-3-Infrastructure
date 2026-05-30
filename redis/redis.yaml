@@ -7,6 +7,11 @@ kind: PersistentVolumeClaim
 metadata:
   name: banka-redis
   namespace: raf-banka
+  annotations:
+    # Same wave as the Deployment so they're applied together — otherwise
+    # the Deployment can't schedule (volume doesn't exist yet at wave -5
+    # while PVC waits at default 0).
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   accessModes: [ReadWriteOnce]
   storageClassName: longhorn
@@ -80,6 +85,8 @@ kind: Service
 metadata:
   name: redis
   namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   selector:
     app.kubernetes.io/name: redis
