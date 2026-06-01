@@ -31,7 +31,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: registry.urosevicvuk.dev/raf-banka3/frontend:main
+          image: registry.urosevicvuk.dev/raf-banka3/frontend:v1.0.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

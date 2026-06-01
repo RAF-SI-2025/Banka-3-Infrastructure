@@ -31,7 +31,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: gateway
-          image: registry.urosevicvuk.dev/raf-banka3/gateway:main
+          image: registry.urosevicvuk.dev/raf-banka3/gateway:v1.0.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

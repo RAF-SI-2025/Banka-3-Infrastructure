@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: user
-          image: registry.urosevicvuk.dev/raf-banka3/user:main
+          image: registry.urosevicvuk.dev/raf-banka3/user:v1.0.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
