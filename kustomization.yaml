@@ -4,6 +4,19 @@ kind: Kustomization
 
 namespace: raf-banka
 
+# Propagate part-of onto every resource (and crucially, every pod template)
+# so the PodMonitor in monitoring/podmonitor.yaml can select all banka pods
+# with one label.
+#   includeTemplates: true  → also stamp the label inside spec.template.metadata
+#                             (default is false — caught us the first time)
+#   includeSelectors: false → DON'T touch Deployment .spec.selector
+#                             (immutable field, would block re-sync)
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: banka-3
+    includeTemplates: true
+    includeSelectors: false
+
 resources:
   - namespace.yaml
   - secrets.yaml
