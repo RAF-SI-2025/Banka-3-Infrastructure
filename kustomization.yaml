@@ -1,8 +1,4 @@
 # Banka-3 deployment root.
-#
-# Picked up by ykube apps/raf/banka/kustomization.yaml (remote base
-# at ?ref=main). The raf ApplicationSet renders this into a single
-# Argo Application raf-banka deployed into the raf-banka namespace.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -22,3 +18,20 @@ resources:
   - services/gateway.yaml
   - frontend/frontend.yaml
   - httproute.yaml
+  - monitoring/podmonitor.yaml
+  - monitoring/prometheusrule.yaml
+  - monitoring/alertmanagerconfig.yaml
+
+# Grafana sidecar discovers dashboards by the grafana_dashboard label
+# across all namespaces by default. disableNameSuffixHash keeps the CM
+# name stable so dashboard updates don't churn a new resource each sync.
+configMapGenerator:
+  - name: banka-overview-dashboard
+    namespace: raf-banka
+    files:
+      - monitoring/dashboards/banka-overview.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true

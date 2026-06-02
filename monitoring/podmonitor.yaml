@@ -1,0 +1,35 @@
+# Scrape /metrics from every banka-3 backend pod's probe port.
+#
+# The Go services mount /metrics on the probe HTTP server (port 8081,
+# named `probe`) via pkg/probes/probes.go::MountMetrics. Frontend has no
+# probe port — prometheus-operator silently skips pods missing the named
+# port, so it's safe to select by the shared part-of label.
+#
+# Relabel: the default `job` label on PodMonitor-derived targets is the
+# PodMonitor name (banka-services), which would collapse all 6 services
+# onto one job. We rewrite `job` from app.kubernetes.io/name so the
+# existing alert expressions (`up{job=~"gateway|user|..."}`) work and
+# Grafana panels can group by service cleanly.
+#
+# Picked up automatically by the cluster Prometheus —
+# podMonitorSelectorNilUsesHelmValues: false in ykube's
+# kube-prometheus-stack values means a nil selector matches every
+# PodMonitor cluster-wide.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: banka-services
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/part-of: banka-3
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: banka-3
+  podMetricsEndpoints:
+    - port: probe
+      path: /metrics
+      interval: 30s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          targetLabel: job

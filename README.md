@@ -24,7 +24,12 @@ ykube apps/raf/banka/kustomization.yaml
             ├─ migrate/job.yaml       — Argo PreSync hook
             ├─ services/<svc>.yaml    — 6 Deployments + Services (gRPC)
             ├─ frontend/frontend.yaml — Vite SPA (nginx)
-            └─ httproute.yaml         — banka.raf-project.com routing
+            ├─ httproute.yaml         — banka.raf-project.com routing
+            └─ monitoring/
+               ├─ podmonitor.yaml         — scrape /metrics on probe port
+               ├─ prometheusrule.yaml     — 3 alerts (svc down, 5xx, gRPC errors)
+               ├─ alertmanagerconfig.yaml — route raf-banka alerts to Discord
+               └─ dashboards/             — Grafana dashboard ConfigMap
 ```
 
 All 6 backend services and the frontend run as 1 replica. Inter-service
@@ -59,6 +64,10 @@ vault kv put kv/raf-banka/interbank \
 # service skips the price-refresh cron.
 vault kv put kv/raf-banka/alphavantage \
   api-key=<key-or-empty>
+
+# Discord webhook for Alertmanager — paste a channel webhook URL
+vault kv put kv/raf-banka/discord \
+  webhook-url=https://discord.com/api/webhooks/<id>/<token>
 
 # Harbor pull credentials
 # 1. In Harbor UI: create project `raf-banka3` (public OR with a robot

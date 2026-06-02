@@ -1,0 +1,43 @@
+# Route raf-banka alerts to Discord.
+#
+# The cluster Alertmanager runs in kube-prometheus-stack; tenant namespaces
+# author their own routing via AlertmanagerConfig CRs. Picked up because
+# ykube's kube-prometheus-stack values set alertmanagerConfigSelector and
+# alertmanagerConfigNamespaceSelector to {} (match-everything).
+#
+# Matcher strategy is the operator default (OnNamespace), which auto-adds
+# a `namespace="raf-banka"` matcher to this AC's top-level route — so only
+# raf-banka alerts hit this discord receiver. No risk of paging on other
+# tenants' alerts.
+#
+# Webhook URL is sourced from the banka-discord Secret (ESO-materialized
+# from kv/raf-banka/discord) in this namespace. The operator reads it at
+# config-render time and injects the URL into Alertmanager's config.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: banka-discord
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/part-of: banka-3
+    tenant: raf
+spec:
+  route:
+    receiver: discord
+    groupBy: [alertname, severity]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    routes:
+      - receiver: discord
+        matchers:
+          - name: severity
+            value: critical
+        repeatInterval: 1h
+  receivers:
+    - name: discord
+      discordConfigs:
+        - apiURL:
+            name: banka-discord
+            key: webhook-url
+          sendResolved: true

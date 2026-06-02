@@ -43,9 +43,6 @@ spec:
         cpu: 50m
         memory: 64Mi
 ---
-# Default-deny + explicit-allow. Mirrors the morel tenant baseline:
-# same-ns, DNS, Vault (ESO), gateway, prometheus scrapes, world for SMTP
-# and Harbor pulls.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -63,9 +60,6 @@ spec:
     - fromEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": kube-prometheus-stack
-    # CNPG operator scrapes the postgres pod's instance manager (:8000)
-    # for status — without this, Cluster status stays Unknown and Argo
-    # never advances past wave -5.
     - fromEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": cloudnative-pg
