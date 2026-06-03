@@ -4,9 +4,11 @@
 # author the burn-rate math by hand; that's what Sloth is for.
 #
 # Metric names below are the OTel semconv names emitted by otelhttp +
-# otelgrpc via the Prometheus exporter in pkg/otelinit. `service_name`
-# is the OTel Resource attribute promoted as a label by the Prom
-# exporter.
+# otelgrpc via the Prometheus exporter in pkg/otelinit. We filter by
+# `job` (set by the PodMonitor's relabel from
+# app.kubernetes.io/name) — the OTel Resource attribute `service.name`
+# is exposed only on `target_info`, not on every series, so it can't
+# be used directly in the matcher.
 #
 # Picked up automatically — Sloth watches every namespace by default.
 apiVersion: sloth.slok.dev/v1
@@ -29,9 +31,9 @@ spec:
       sli:
         events:
           errorQuery: |
-            sum(rate(http_server_request_duration_seconds_count{service_name="gateway",http_response_status_code=~"5.."}[{{.window}}]))
+            sum(rate(http_server_request_duration_seconds_count{job="gateway",http_response_status_code=~"5.."}[{{.window}}]))
           totalQuery: |
-            sum(rate(http_server_request_duration_seconds_count{service_name="gateway"}[{{.window}}]))
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[{{.window}}]))
       alerting:
         name: GatewayAvailabilityBudgetBurn
         labels:
@@ -49,12 +51,12 @@ spec:
       sli:
         events:
           errorQuery: |
-            sum(rate(http_server_request_duration_seconds_bucket{service_name="gateway",le="0.5"}[{{.window}}]))
+            sum(rate(http_server_request_duration_seconds_bucket{job="gateway",le="0.5"}[{{.window}}]))
             -
-            sum(rate(http_server_request_duration_seconds_bucket{service_name="gateway",le="+Inf"}[{{.window}}]))
+            sum(rate(http_server_request_duration_seconds_bucket{job="gateway",le="+Inf"}[{{.window}}]))
             + 0  # keep the equation positive; Sloth divides good/total
           totalQuery: |
-            sum(rate(http_server_request_duration_seconds_count{service_name="gateway"}[{{.window}}]))
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[{{.window}}]))
       alerting:
         name: GatewayLatencyBudgetBurn
         labels:
@@ -89,9 +91,9 @@ spec:
       sli:
         events:
           errorQuery: |
-            sum(rate(rpc_server_duration_milliseconds_count{service_name=~"user|bank|trading|exchange|notification",rpc_grpc_status_code!="0"}[{{.window}}]))
+            sum(rate(rpc_server_duration_seconds_count{job=~"user|bank|trading|exchange|notification",rpc_grpc_status_code!="0"}[{{.window}}]))
           totalQuery: |
-            sum(rate(rpc_server_duration_milliseconds_count{service_name=~"user|bank|trading|exchange|notification"}[{{.window}}]))
+            sum(rate(rpc_server_duration_seconds_count{job=~"user|bank|trading|exchange|notification"}[{{.window}}]))
       alerting:
         name: InternalRPCAvailabilityBudgetBurn
         labels:
