@@ -31,20 +31,24 @@ spec:
           type: RuntimeDefault
       containers:
         - name: gateway
-          image: registry.urosevicvuk.dev/raf-banka3/gateway:v1.0.0
+          image: registry.urosevicvuk.dev/raf-banka3/gateway:v1.1.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
-            - { name: http,  containerPort: 8080 }
-            - { name: probe, containerPort: 8081 }
+            - { name: http,    containerPort: 8080 }
+            - { name: probe,   containerPort: 8081 }
+            - { name: metrics, containerPort: 9090 }
           env:
             - { name: GATEWAY_HTTP_PORT, value: "8080" }
             - { name: PROBE_PORT,        value: "8081" }
             - { name: LOG_LEVEL,         value: info }
             - { name: LOG_FORMAT,        value: json }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.alloy:4317" }
+            - name: OTEL_SERVICE_NAME
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } }
             - { name: REDIS_ADDR,        value: "redis:6379" }
             - { name: USER_GRPC_ADDR,         value: "user:50051" }
             - { name: BANK_GRPC_ADDR,         value: "bank:50051" }

@@ -6,71 +6,29 @@
   "graphTooltip": 0,
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
       "id": 1,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "sum by (route, method) (rate(banka_http_requests_total{service=\"gateway\"}[5m]))",
-          "legendFormat": "{{method}} {{route}}",
+          "expr": "sum by (http_request_method, http_route) (rate(http_server_request_duration_seconds_count{service_name=\"gateway\"}[5m]))",
+          "legendFormat": "{{http_request_method}} {{http_route}}",
           "refId": "A"
         }
       ],
-      "title": "Gateway Request Rate",
+      "title": "Gateway Request Rate (otelhttp)",
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
       "id": 2,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "sum by (status) (rate(banka_http_requests_total{service=\"gateway\"}[5m]))",
-          "legendFormat": "{{status}}",
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_name=\"gateway\"}[5m]))",
+          "legendFormat": "{{http_response_status_code}}",
           "refId": "A"
         }
       ],
@@ -78,35 +36,14 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "id": 3,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, route, method) (rate(banka_http_request_duration_seconds_bucket{service=\"gateway\"}[5m])))",
-          "legendFormat": "p95 {{method}} {{route}}",
+          "expr": "histogram_quantile(0.95, sum by (le, http_route, http_request_method) (rate(http_server_request_duration_seconds_bucket{service_name=\"gateway\"}[5m])))",
+          "legendFormat": "p95 {{http_request_method}} {{http_route}}",
           "refId": "A"
         }
       ],
@@ -114,91 +51,62 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "id": 4,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "sum by (service, code) (rate(banka_grpc_requests_total[5m]))",
-          "legendFormat": "{{service}} {{code}}",
+          "expr": "sum by (service_name, rpc_grpc_status_code) (rate(rpc_server_duration_milliseconds_count[5m]))",
+          "legendFormat": "{{service_name}} code={{rpc_grpc_status_code}}",
           "refId": "A"
         }
       ],
-      "title": "gRPC Request Rate by Status",
+      "title": "gRPC Request Rate by Status (otelgrpc)",
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, service_name, rpc_service, rpc_method) (rate(rpc_server_duration_milliseconds_bucket[5m])))",
+          "legendFormat": "p99 {{service_name}} {{rpc_service}}/{{rpc_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "gRPC p99 Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
+          "color": {"mode": "thresholds"},
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
+              {"color": "red", "value": 0},
+              {"color": "green", "value": 1}
             ]
           }
-        },
-        "overrides": []
+        }
       },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
       "id": 5,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "textMode": "name"
       },
       "targets": [
         {
-          "expr": "up",
+          "expr": "up{job=~\"gateway|user|notification|bank|exchange|trading\"}",
           "legendFormat": "{{job}}",
           "refId": "A"
         }
@@ -211,16 +119,11 @@
   "schemaVersion": 39,
   "style": "dark",
   "tags": ["banka", "observability"],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
   "timezone": "browser",
   "title": "Banka Observability Overview",
   "uid": "banka-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

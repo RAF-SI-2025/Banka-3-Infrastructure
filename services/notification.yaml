@@ -28,20 +28,24 @@ spec:
           type: RuntimeDefault
       containers:
         - name: notification
-          image: registry.urosevicvuk.dev/raf-banka3/notification:v1.0.0
+          image: registry.urosevicvuk.dev/raf-banka3/notification:v1.1.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
-            - { name: grpc,  containerPort: 50051 }
-            - { name: probe, containerPort: 8081 }
+            - { name: grpc,    containerPort: 50051 }
+            - { name: probe,   containerPort: 8081 }
+            - { name: metrics, containerPort: 9090 }
           env:
             - { name: GRPC_PORT,  value: "50051" }
             - { name: PROBE_PORT, value: "8081" }
             - { name: LOG_LEVEL,  value: info }
             - { name: LOG_FORMAT, value: json }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.alloy:4317" }
+            - name: OTEL_SERVICE_NAME
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } }
             - name: DATABASE_URL
               valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
             - { name: REDIS_ADDR, value: "redis:6379" }

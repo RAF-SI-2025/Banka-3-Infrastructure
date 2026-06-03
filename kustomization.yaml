@@ -34,6 +34,7 @@ resources:
   - monitoring/podmonitor.yaml
   - monitoring/prometheusrule.yaml
   - monitoring/alertmanagerconfig.yaml
+  - monitoring/slo.yaml
 
 # Grafana sidecar discovers dashboards by the grafana_dashboard label
 # across all namespaces by default. disableNameSuffixHash keeps the CM

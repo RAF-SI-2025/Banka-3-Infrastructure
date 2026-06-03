@@ -1,11 +1,4 @@
-# CloudNativePG cluster for banka-3. One Postgres, database `banka`,
-# owner role `banka`. The 5 service schemas (user/bank/trading/
-# exchange/notification) are created by the per-service migrations,
-# not in postInitApplicationSQL.
-#
-# CNPG mints a `banka-pg-app` Secret on bootstrap with keys:
-#   username, password, host, port, dbname, uri, jdbc-uri, pgpass
-# We feed `uri` straight into DATABASE_URL on every service.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/postgresql.cnpg.io/cluster_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

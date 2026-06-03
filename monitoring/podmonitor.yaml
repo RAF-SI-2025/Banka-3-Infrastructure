@@ -1,15 +1,22 @@
-# Scrape /metrics from every banka-3 backend pod's probe port.
+# Scrape /metrics from every banka-3 backend pod's dedicated metrics
+# port (9090), exposed by pkg/otelinit.Provider.RunMetricsServer on a
+# separate listener from the probe server.
 #
-# The Go services mount /metrics on the probe HTTP server (port 8081,
-# named `probe`) via pkg/probes/probes.go::MountMetrics. Frontend has no
-# probe port — prometheus-operator silently skips pods missing the named
-# port, so it's safe to select by the shared part-of label.
+# Why a separate port from probe: a failing readiness probe used to
+# black out the scrape too — exactly when we needed metrics most.
+# Splitting them costs nothing and means an in-trouble pod still
+# surfaces its degradation in Grafana.
 #
-# Relabel: the default `job` label on PodMonitor-derived targets is the
-# PodMonitor name (banka-services), which would collapse all 6 services
-# onto one job. We rewrite `job` from app.kubernetes.io/name so the
-# existing alert expressions (`up{job=~"gateway|user|..."}`) work and
-# Grafana panels can group by service cleanly.
+# Frontend has no metrics port — prometheus-operator silently skips
+# pods missing the named port, so it's safe to select by the shared
+# part-of label.
+#
+# Relabel: the default `job` label on PodMonitor-derived targets is
+# the PodMonitor name (banka-services), which would collapse all 6
+# services onto one job. We rewrite `job` from
+# app.kubernetes.io/name so existing alert expressions
+# (`up{job=~"gateway|user|..."}`) keep working. The OTel SDK also
+# stamps `service_name` as a metric label; both work.
 #
 # Picked up automatically by the cluster Prometheus —
 # podMonitorSelectorNilUsesHelmValues: false in ykube's
@@ -27,7 +34,7 @@ spec:
     matchLabels:
       app.kubernetes.io/part-of: banka-3
   podMetricsEndpoints:
-    - port: probe
+    - port: metrics
       path: /metrics
       interval: 30s
       relabelings:

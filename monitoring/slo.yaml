@@ -1,0 +1,102 @@
+# Sloth-generated SLOs for Banka-3. Sloth lives in the `sloth`
+# namespace and generates a PrometheusRule CR alongside this one with
+# the recording rules + multi-window multi-burn-rate alerts. We never
+# author the burn-rate math by hand; that's what Sloth is for.
+#
+# Metric names below are the OTel semconv names emitted by otelhttp +
+# otelgrpc via the Prometheus exporter in pkg/otelinit. `service_name`
+# is the OTel Resource attribute promoted as a label by the Prom
+# exporter.
+#
+# Picked up automatically — Sloth watches every namespace by default.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: banka-gateway
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/part-of: banka-3
+    tenant: raf
+spec:
+  service: gateway
+  labels:
+    tenant: raf
+    cluster: firelink
+  slos:
+    - name: requests-availability
+      objective: 99.5
+      description: 99.5% of public HTTP requests served without 5xx over 28d.
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_server_request_duration_seconds_count{service_name="gateway",http_response_status_code=~"5.."}[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_server_request_duration_seconds_count{service_name="gateway"}[{{.window}}]))
+      alerting:
+        name: GatewayAvailabilityBudgetBurn
+        labels:
+          severity_category: availability
+        annotations:
+          summary: "Gateway availability SLO budget is burning."
+        pageAlert:
+          labels: { severity: critical, tenant: raf }
+        ticketAlert:
+          labels: { severity: warning,  tenant: raf }
+
+    - name: requests-latency
+      objective: 99
+      description: 99% of public HTTP requests faster than 500ms over 28d.
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(http_server_request_duration_seconds_bucket{service_name="gateway",le="0.5"}[{{.window}}]))
+            -
+            sum(rate(http_server_request_duration_seconds_bucket{service_name="gateway",le="+Inf"}[{{.window}}]))
+            + 0  # keep the equation positive; Sloth divides good/total
+          totalQuery: |
+            sum(rate(http_server_request_duration_seconds_count{service_name="gateway"}[{{.window}}]))
+      alerting:
+        name: GatewayLatencyBudgetBurn
+        labels:
+          severity_category: latency
+        annotations:
+          summary: "Gateway p99 latency SLO budget is burning."
+        pageAlert:
+          labels: { severity: critical, tenant: raf }
+        ticketAlert:
+          labels: { severity: warning,  tenant: raf }
+---
+# Internal services share one SLO definition shape — write it once
+# per service rather than templating to keep the rules readable in
+# Grafana's Sloth dashboard.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: banka-internal-rpc
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/part-of: banka-3
+    tenant: raf
+spec:
+  service: banka-internal
+  labels:
+    tenant: raf
+    cluster: firelink
+  slos:
+    - name: grpc-availability
+      objective: 99.9
+      description: 99.9% of internal gRPC calls return OK over 28d.
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(rpc_server_duration_milliseconds_count{service_name=~"user|bank|trading|exchange|notification",rpc_grpc_status_code!="0"}[{{.window}}]))
+          totalQuery: |
+            sum(rate(rpc_server_duration_milliseconds_count{service_name=~"user|bank|trading|exchange|notification"}[{{.window}}]))
+      alerting:
+        name: InternalRPCAvailabilityBudgetBurn
+        labels:
+          severity_category: availability
+        pageAlert:
+          labels: { severity: critical, tenant: raf }
+        ticketAlert:
+          labels: { severity: warning,  tenant: raf }
