@@ -9,39 +9,32 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banka-3
     tenant: raf
----
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: tenant-quota
-  namespace: raf-banka
-spec:
-  hard:
-    requests.cpu: "4"
-    requests.memory: 8Gi
-    limits.cpu: "8"
-    limits.memory: 16Gi
-    requests.storage: 50Gi
-    persistentvolumeclaims: "20"
-    pods: "50"
-    services: "20"
-    secrets: "50"
-    configmaps: "50"
----
-apiVersion: v1
-kind: LimitRange
-metadata:
-  name: tenant-defaults
-  namespace: raf-banka
-spec:
-  limits:
-    - type: Container
-      default:
-        cpu: 500m
-        memory: 256Mi
-      defaultRequest:
-        cpu: 50m
-        memory: 64Mi
+# ResourceQuota `tenant-quota` and LimitRange `tenant-defaults` removed
+# during architecture iteration (same reason as the CNP below).
+# The ResourceQuota declared `limits.cpu` / `limits.memory` caps,
+# which forces every pod to specify those limits — CNPG sidecars
+# (bootstrap-controller, initdb, major-upgrade) intentionally omit
+# `limits.cpu` because CPU throttling is harmful for Postgres. The
+# LimitRange's default wasn't getting applied in time, leaving the
+# quota webhook to reject the pods.
+#
+# When re-adding:
+#   - ResourceQuota: drop the `limits.*` caps; keep only `requests.*`
+#     so containers without explicit limits can still schedule. The
+#     storage / pods / services / secrets / configmaps caps are fine.
+#   - LimitRange: verify the `default:` for cpu/memory is actually
+#     getting injected into CNPG-spawned pods before re-enabling the
+#     quota. (`kubectl get pod ... -o yaml | grep -A8 resources`)
+#
+# Original ResourceQuota.hard was:
+#   requests.cpu: "4", requests.memory: 8Gi,
+#   limits.cpu: "8",  limits.memory: 16Gi,
+#   requests.storage: 50Gi, persistentvolumeclaims: "20",
+#   pods: "50", services: "20", secrets: "50", configmaps: "50"
+# Original LimitRange (Container type):
+#   default: { cpu: 500m, memory: 256Mi }
+#   defaultRequest: { cpu: 50m, memory: 64Mi }
+#
 # CiliumNetworkPolicy `tenant-baseline` removed — permissive defaults
 # while the platform's architecture is still in flux. Add policies
 # back once the shape stabilizes. When re-adding:
