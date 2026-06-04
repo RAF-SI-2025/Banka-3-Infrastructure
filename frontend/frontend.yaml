@@ -12,7 +12,8 @@ metadata:
     app.kubernetes.io/name: frontend
     app.kubernetes.io/part-of: banka-3
 spec:
-  replicas: 1
+  # Replicas managed by the HPA in hpas.yaml — omitted so server-side
+  # apply leaves it to the HPA controller's field manager.
   selector:
     matchLabels:
       app.kubernetes.io/name: frontend

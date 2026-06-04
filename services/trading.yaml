@@ -9,7 +9,12 @@ metadata:
     app.kubernetes.io/name: trading
     app.kubernetes.io/part-of: banka-3
 spec:
-  replicas: 1
+  # Replicas managed by the HPA in hpas.yaml — omitted so server-side
+  # apply leaves it to the HPA controller. Trading's execution worker /
+  # SAGA recovery / OTC expiry / market-data refresh / actuary reset /
+  # tax cron / options refresh / fund-perf snapshot all live in the
+  # scheduler service now (JOBS_ENABLED=false below), so every replica
+  # is a pure request handler safe to scale.
   selector:
     matchLabels:
       app.kubernetes.io/name: trading
@@ -28,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: trading
-          image: registry.urosevicvuk.dev/raf-banka3/trading:v0.3.3
+          image: registry.urosevicvuk.dev/raf-banka3/trading:v0.3.5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -59,6 +64,10 @@ spec:
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-rw:5432/banka"
             - name: DATABASE_READ_URL
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-ro:5432/banka"
+            # Background workers + crons (execution, saga-recovery,
+            # otc-expiry, options-refresh, market-data, actuary-reset,
+            # monthly tax, fund-perf) live in the scheduler service.
+            - { name: JOBS_ENABLED,               value: "false" }
             - { name: REDIS_ADDR,                 value: "redis:6379" }
             - { name: BANK_GRPC_ADDR,             value: "bank:50051" }
             - { name: EXCHANGE_GRPC_ADDR,         value: "exchange:50051" }
@@ -77,6 +86,11 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Requests sized for the trading request path post-extraction
+          # (no more in-process workers); HPA denominator.
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { memory: 384Mi }
 ---
 apiVersion: v1
 kind: Service

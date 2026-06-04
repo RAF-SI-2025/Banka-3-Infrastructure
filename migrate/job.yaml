@@ -49,7 +49,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: migrate
-          image: registry.urosevicvuk.dev/raf-banka3/migrate:v0.3.0
+          image: registry.urosevicvuk.dev/raf-banka3/migrate:v0.3.5
           # Always re-pull — :main is a mutable tag and we iterate on the
           # migrate script during deploy bring-up. Otherwise kubelet keeps
           # the first cached digest forever (IfNotPresent default).

@@ -1,20 +1,26 @@
-# HPAs for the stateless services. Each scales on CPU utilization
-# against the Deployment's requests.cpu (set in services/*.yaml and
-# frontend/frontend.yaml). The "stateless" set is the four pods with
-# no embedded background work — bank/trading/exchange are deliberately
-# excluded until the cron-extraction lands on the backend, because
-# duplicating those cron loops across replicas would double-debit /
-# double-fill / double-tax. See README / project memory.
+# HPAs for every horizontally-scalable service. Each scales on CPU
+# utilization against the Deployment's requests.cpu (set in services/*.yaml
+# and frontend/frontend.yaml). bank/trading/exchange joined this set
+# once the scheduler service took over their in-process cron loops
+# (JOBS_ENABLED=false in their Deployments) — duplicating those crons
+# across replicas would have double-fired tax jobs / FX feeders /
+# installment runs. Scheduler itself is NOT in this list: it's
+# leader-elected with replicas=2, followers do no useful work.
 #
-# Behavior tuned to avoid replica flapping:
-#   * stabilizationWindowSeconds=120 on scaleDown — wait two minutes
-#     of sustained low CPU before peeling a replica off.
-#   * scaleUp leaves Kubernetes defaults (0s stabilization, aggressive
-#     percent-based growth) so a real traffic burst gets capacity fast.
+# minReplicas=3 across the board (notification at 2 since it's
+# mostly idle). Deployments intentionally omit `spec.replicas` so
+# server-side apply leaves the field to the HPA controller's field
+# manager and Argo doesn't fight scale events.
 #
-# Resource-metric source: metrics-server (apps/system/foundation/
-# metrics-server in ykube). HPA fails closed (no scaling action) if
-# metrics-server is unhealthy, which is the safe default.
+# Behavior tuning:
+#   * stabilizationWindowSeconds=120 on scaleDown — two minutes of
+#     sustained low CPU before peeling a replica off.
+#   * scaleUp left at k8s defaults (0s stabilization, percent-based
+#     growth) so a real burst gets capacity fast.
+#
+# Resource-metric source: k3s's bundled metrics-server. HPA fails
+# closed (no scaling action) if metrics-server is unhealthy, which
+# is the safe default.
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -29,8 +35,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: gateway
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 6
   metrics:
     - type: Resource
       resource:
@@ -55,8 +61,86 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: user
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bank
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: bank
+    app.kubernetes.io/part-of: banka-3
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bank
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trading
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: trading
+    app.kubernetes.io/part-of: banka-3
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trading
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: exchange
+  namespace: raf-banka
+  labels:
+    app.kubernetes.io/name: exchange
+    app.kubernetes.io/part-of: banka-3
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: exchange
+  minReplicas: 3
+  maxReplicas: 6
   metrics:
     - type: Resource
       resource:
@@ -81,8 +165,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: notification
-  minReplicas: 1
-  maxReplicas: 2
+  minReplicas: 2
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
@@ -107,8 +191,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: frontend
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 6
   metrics:
     - type: Resource
       resource:

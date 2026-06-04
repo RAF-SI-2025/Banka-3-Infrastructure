@@ -1,0 +1,143 @@
+# Scheduler — the single non-replicatable driver of every cluster-wide
+# cron + worker. Runs N replicas (HA), only the Lease-holder fires jobs
+# via gRPC into bank/trading/exchange. The business services run with
+# JOBS_ENABLED=false; this one owns timing + leader-election.
+#
+# No Service is exposed: the scheduler is an outbound-only process.
+# Probes on :8081 for kubelet, metrics on :9090 for the namespace
+# PodMonitor (the kustomization labels every pod with
+# `app.kubernetes.io/part-of: banka-3`, which is the PodMonitor's
+# selector).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduler
+  namespace: raf-banka
+---
+# Lease access — leader-election in services/scheduler/internal/app/leader.go
+# uses a coordination.k8s.io/v1 Lease named `scheduler-leader` in this
+# namespace. The role is scoped narrow on purpose: only this one lease,
+# only the verbs the client-go leaderelection package actually calls.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: scheduler-leader-election
+  namespace: raf-banka
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames: ["scheduler-leader"]
+    verbs: ["get", "update"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    # `create` can't carry a resourceNames restriction (the object
+    # doesn't exist yet at the time of the verb check), so it has to
+    # be a separate rule with no name pin. The Lease name is still
+    # controlled by the scheduler's LEASE_NAME env below.
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: scheduler-leader-election
+  namespace: raf-banka
+subjects:
+  - kind: ServiceAccount
+    name: scheduler
+    namespace: raf-banka
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: scheduler-leader-election
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  labels:
+    app.kubernetes.io/name: scheduler
+    app.kubernetes.io/part-of: banka-3
+spec:
+  # Two replicas: one active leader + one warm standby. No HPA on this
+  # service — followers do no useful work (the leader-election callback
+  # gates job dispatch), so scaling on CPU doesn't help. If the leader
+  # is killed, the standby acquires the Lease within ~15s (LeaseDuration
+  # in leader.go).
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scheduler
+    spec:
+      serviceAccountName: scheduler
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: scheduler
+          image: registry.urosevicvuk.dev/raf-banka3/scheduler:v0.3.5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - { name: probe,   containerPort: 8081 }
+            - { name: metrics, containerPort: 9090 }
+          env:
+            - { name: PROBE_PORT, value: "8081" }
+            - { name: LOG_LEVEL,  value: info }
+            - { name: LOG_FORMAT, value: json }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.alloy:4317" }
+            - name: OTEL_SERVICE_NAME
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } }
+            # Leader election ON in cluster; the in-cluster k8s client
+            # uses the pod's mounted SA token (granted by the
+            # scheduler-leader-election Role above).
+            - { name: LEADER_ELECTION, value: "true" }
+            - { name: LEASE_NAME,      value: "scheduler-leader" }
+            - name: POD_NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            # Downstream gRPC targets — same in-cluster Services every
+            # other service dials.
+            - { name: BANK_GRPC_ADDR,     value: "bank:50051" }
+            - { name: TRADING_GRPC_ADDR,  value: "trading:50051" }
+            - { name: EXCHANGE_GRPC_ADDR, value: "exchange:50051" }
+            # Cron cadences — keep defaults from services/scheduler/
+            # internal/app/jobs.go. Override here only when tuning.
+          readinessProbe:
+            httpGet: { path: /readyz, port: probe }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: probe }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits:   { memory: 192Mi }
+---
+# Keep at least one scheduler available during voluntary disruptions
+# (node drain, rollout). With replicas: 2 + minAvailable: 1 the leader
+# can be killed and the standby takes over before the second pod
+# disappears.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: scheduler
+  namespace: raf-banka
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scheduler

@@ -9,7 +9,9 @@ metadata:
     app.kubernetes.io/name: bank
     app.kubernetes.io/part-of: banka-3
 spec:
-  replicas: 1
+  # Replicas managed by the HPA in hpas.yaml. Field is intentionally
+  # omitted so server-side apply leaves it to the HPA controller's
+  # field manager — Argo won't fight HPA-driven scale events.
   selector:
     matchLabels:
       app.kubernetes.io/name: bank
@@ -28,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: bank
-          image: registry.urosevicvuk.dev/raf-banka3/bank:v0.3.3
+          image: registry.urosevicvuk.dev/raf-banka3/bank:v0.3.5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -64,6 +66,11 @@ spec:
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-rw:5432/banka"
             - name: DATABASE_READ_URL
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-ro:5432/banka"
+            # Background jobs (installments, variable-rate, maintenance-fee,
+            # spent-reset) are owned by the scheduler service. With this
+            # off, every bank pod becomes a pure request handler and the
+            # HPA can scale freely without double-firing crons.
+            - { name: JOBS_ENABLED,           value: "false" }
             - { name: REDIS_ADDR,             value: "redis:6379" }
             - { name: USER_GRPC_ADDR,         value: "user:50051" }
             - { name: EXCHANGE_GRPC_ADDR,     value: "exchange:50051" }
@@ -92,6 +99,13 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Requests are the HPA's denominator; without them HPA can't
+          # compute utilization. Bank carries DB transactions + FX
+          # math + the largest service surface, hence higher requests
+          # than the lighter services.
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { memory: 384Mi }
 ---
 apiVersion: v1
 kind: Service

@@ -30,6 +30,7 @@ resources:
   - services/exchange.yaml
   - services/notification.yaml
   - services/gateway.yaml
+  - services/scheduler.yaml
   - frontend/frontend.yaml
   - httproute.yaml
   - hpas.yaml

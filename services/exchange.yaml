@@ -9,7 +9,9 @@ metadata:
     app.kubernetes.io/name: exchange
     app.kubernetes.io/part-of: banka-3
 spec:
-  replicas: 1
+  # Replicas managed by the HPA in hpas.yaml — omitted so server-side
+  # apply leaves it to the HPA controller. The FX feeder is owned by
+  # the scheduler service now (JOBS_ENABLED=false below).
   selector:
     matchLabels:
       app.kubernetes.io/name: exchange
@@ -28,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: exchange
-          image: registry.urosevicvuk.dev/raf-banka3/exchange:v0.3.3
+          image: registry.urosevicvuk.dev/raf-banka3/exchange:v0.3.5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -59,6 +61,10 @@ spec:
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-rw:5432/banka"
             - name: DATABASE_READ_URL
               value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-ro:5432/banka"
+            # FX feeder loop owned by the scheduler service. Exchange
+            # still exposes RefreshFXRates RPC; scheduler calls it on
+            # its FX_FEED_INTERVAL cadence.
+            - { name: JOBS_ENABLED,     value: "false" }
             - { name: REDIS_ADDR,       value: "redis:6379" }
             - { name: FX_FEED_INTERVAL, value: "5m" }
             - { name: FX_FEED_SPREAD,   value: "0.01" }
@@ -68,6 +74,11 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Lightweight read-mostly service (catalog + FX rate reads).
+          # Requests sized accordingly; HPA denominator.
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits:   { memory: 256Mi }
 ---
 apiVersion: v1
 kind: Service
