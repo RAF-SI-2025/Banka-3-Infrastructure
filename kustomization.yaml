@@ -32,6 +32,7 @@ resources:
   - services/gateway.yaml
   - frontend/frontend.yaml
   - httproute.yaml
+  - hpas.yaml
   - monitoring/podmonitor.yaml
   - monitoring/prometheusrule.yaml
   - monitoring/alertmanagerconfig.yaml

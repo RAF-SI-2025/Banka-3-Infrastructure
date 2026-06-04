@@ -68,6 +68,13 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Requests are the HPA's denominator — without them, the
+          # HorizontalPodAutoscaler can't compute a utilization %.
+          # No CPU limit on purpose; the workload is bursty HTTP/gRPC
+          # fan-out and CPU throttling under load is anti-pattern.
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { memory: 256Mi }
 ---
 apiVersion: v1
 kind: Service

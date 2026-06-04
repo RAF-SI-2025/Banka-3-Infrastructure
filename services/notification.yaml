@@ -78,6 +78,12 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Modest requests — this service is mostly idle, just relays
+          # gRPC notification requests out to SMTP. HPA target lifts
+          # us off 1 replica only when an email burst is in flight.
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits:   { memory: 192Mi }
 ---
 apiVersion: v1
 kind: Service

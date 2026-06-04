@@ -17,7 +17,10 @@ vars:
   SERVICES: user bank trading exchange notification gateway
   # Every image that gets a cosign signature. SERVICES + migrate + frontend.
   SIGNED_IMAGES: user bank trading exchange notification gateway migrate frontend
-  COSIGN_KEY_VAULT_PATH: kv/raf-banka/cosign
+  # Keyless signing identity — the Subject baked into the Fulcio cert
+  # by GitHub Actions OIDC. Used by verify:all for local sanity checks.
+  COSIGN_IDENTITY_REGEXP: '^https://github\.com/RAF-SI-2025/Banka-3-(Backend|Frontend)/\.github/workflows/build\.yml@refs/(heads/(main|deploy)|tags/v.+)$'
+  COSIGN_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 tasks:
   default:
@@ -92,48 +95,33 @@ tasks:
           .
 
   push:all:
-    desc: Build + push every image, then cosign-sign each
+    desc: Build + push every image. Signing is CI-only (keyless via GitHub OIDC).
     cmds:
       - task: push:backend
       - task: push:migrate
       - task: push:frontend
-      - task: sign:all
 
   # ----------------------------------------------------------------
-  # Signing — cosign sign every published image with the keypair
-  # stored in Vault. Kyverno verifies on the cluster side. See
+  # Verification — keyless cosign verify, useful as a local sanity
+  # check after CI has pushed + signed. Signing itself can't run
+  # locally: keyless requires a GitHub Actions OIDC token, so the
+  # producer side lives in Banka-3-Backend / Banka-3-Frontend
+  # .github/workflows/build.yml. Cluster-side enforcement lives in
   # ykube/apps/system/security/kyverno/policies/verify-banka-images.yaml.
   # ----------------------------------------------------------------
 
-  sign:all:
-    desc: Cosign-sign every pushed image (fetches private key from Vault — needs VAULT_ADDR + VAULT_TOKEN set)
-    cmds:
-      - |
-        set -e
-        if [[ -z "${VAULT_ADDR:-}" || -z "${VAULT_TOKEN:-}" ]]; then
-          echo "VAULT_ADDR and VAULT_TOKEN must be set (kubectl port-forward to vault:8200 + export the root token)." >&2
-          exit 1
-        fi
-        export COSIGN_PRIVATE_KEY=$(vault kv get -field=private-key {{.COSIGN_KEY_VAULT_PATH}})
-        export COSIGN_PASSWORD=$(vault kv get -field=password {{.COSIGN_KEY_VAULT_PATH}})
-        for img in {{.SIGNED_IMAGES}}; do
-          ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
-          echo "==> signing $ref"
-          # --tlog-upload=false keeps signatures out of the public Rekor
-          # transparency log (this is a private homelab keypair, not a
-          # public-identity flow).
-          cosign sign --key env://COSIGN_PRIVATE_KEY --tlog-upload=false --yes "$ref"
-        done
-
   verify:all:
-    desc: Locally verify every signed image against the published public key (sanity check)
+    desc: Locally verify the keyless cosign signature on every published image.
     cmds:
       - |
         set -e
         for img in {{.SIGNED_IMAGES}}; do
           ref="{{.REGISTRY}}/{{.PROJECT}}/$img:{{.TAG}}"
           echo "==> verifying $ref"
-          cosign verify --key cosign.pub --insecure-ignore-tlog "$ref" >/dev/null
+          cosign verify \
+            --certificate-identity-regexp='{{.COSIGN_IDENTITY_REGEXP}}' \
+            --certificate-oidc-issuer='{{.COSIGN_OIDC_ISSUER}}' \
+            "$ref" >/dev/null
         done
         echo "all images verified"
 

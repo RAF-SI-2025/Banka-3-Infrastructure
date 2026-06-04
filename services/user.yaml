@@ -101,6 +101,12 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probe }
             periodSeconds: 10
+          # Requests are required for HPA utilization math. Argon2id
+          # password hashing makes this service the CPU-spikier of the
+          # stateless set, hence the higher request.
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { memory: 384Mi }
 ---
 apiVersion: v1
 kind: Service
