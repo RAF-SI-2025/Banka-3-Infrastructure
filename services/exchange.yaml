@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: exchange
-          image: registry.urosevicvuk.dev/raf-banka3/exchange:v0.3.0
+          image: registry.urosevicvuk.dev/raf-banka3/exchange:v0.3.3
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
