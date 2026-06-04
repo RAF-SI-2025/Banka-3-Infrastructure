@@ -42,50 +42,15 @@ spec:
       defaultRequest:
         cpu: 50m
         memory: 64Mi
----
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: tenant-baseline
-  namespace: raf-banka
-spec:
-  endpointSelector: {}
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": raf-banka
-    - fromEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": envoy-gateway-system
-    - fromEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": kube-prometheus-stack
-    - fromEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": cloudnative-pg
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": raf-banka
-    - toEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": kube-system
-            "k8s:k8s-app": kube-dns
-      toPorts:
-        - ports:
-            - port: "53"
-              protocol: UDP
-            - port: "53"
-              protocol: TCP
-    - toEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": vault
-      toPorts:
-        - ports:
-            - port: "8200"
-              protocol: TCP
-    - toEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": external-secrets
-    - toEntities:
-        - world   # SMTP, AlphaVantage, Harbor pulls, partner banks
+# CiliumNetworkPolicy `tenant-baseline` removed — permissive defaults
+# while the platform's architecture is still in flux. Add policies
+# back once the shape stabilizes. When re-adding:
+#   - egress MUST include `toEntities: [kube-apiserver]` (Cilium
+#     treats apiserver as a distinct entity from `world`); without
+#     this, CNPG bootstrap-controller + major-upgrade jobs time out
+#     trying to fetch their Cluster CR — this was the exact failure
+#     mode that triggered the original removal.
+#   - egress to `cloudnative-pg` namespace if the operator webhook
+#     needs to reach raf-banka pods.
+#   - ingress already covered raf-banka, envoy-gateway-system,
+#     kube-prometheus-stack, cloudnative-pg.
