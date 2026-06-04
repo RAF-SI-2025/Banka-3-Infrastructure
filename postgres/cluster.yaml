@@ -1,4 +1,31 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/postgresql.cnpg.io/cluster_v1.json
+#
+# 3-instance CNPG cluster: one primary + two hot standbys. CNPG
+# auto-publishes three Services in this namespace:
+#
+#   banka-pg-rw  → current primary (failover-aware, RW)
+#   banka-pg-ro  → standbys only (round-robin, read-only, async-lagged)
+#   banka-pg-r   → any instance
+#
+# App-side routing lives in pkg/postgres: each service holds a *DB with
+# RW + RO pools; writes and tx default to -rw, opt-in reads marked with
+# postgres.WithRead(ctx) hit -ro. The auto-generated banka-pg-app secret
+# has user/password/dbname keys that the Deployment manifests compose
+# into DATABASE_READ_URL pointing at banka-pg-ro.
+#
+# No Pooler (PgBouncer) here. With instances=1 on the app side there's
+# no conn-pressure to relieve; PgBouncer in transaction mode forces a
+# pgx prepared-statement compatibility dance that isn't worth the
+# risk yet. Revisit when the cron-extraction lands and we HPA the
+# stateful services — at that point add CNPG Pooler resources fronting
+# both -rw and -ro and re-point DATABASE_URL / DATABASE_READ_URL.
+#
+# Major-version bump (16.4 → 18) is not in-place: CNPG's validating
+# webhook rejects mismatched postgresVersion against an existing PVC.
+# When this manifest first applies:
+#   kubectl delete cluster -n raf-banka banka-pg
+# Argo re-creates with the new spec, the wave-0 migrate Job rebuilds
+# the schema, `make seed` repopulates fixtures.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -7,15 +34,22 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
 spec:
-  instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.0
   storage:
-    size: 10Gi
+    size: 30Gi
     storageClass: longhorn
   bootstrap:
     initdb:
       database: banka
       owner: banka
+  # Spread instances across nodes when the topology allows it.
+  # `preferred` (not `required`) so a single-node ykube still
+  # schedules all three replicas onto the same host.
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: preferred
+    topologyKey: kubernetes.io/hostname
   resources:
     requests:
       cpu: 100m

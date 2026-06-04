@@ -48,6 +48,14 @@ spec:
               valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } }
             - name: DATABASE_URL
               valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
+            # Read-replica DSN (banka-pg-ro). pkg/postgres opens this
+            # as the RO pool; WithRead(ctx)-marked queries land here.
+            - name: BANKA_DB_USER
+              valueFrom: { secretKeyRef: { name: banka-pg-app, key: username } }
+            - name: BANKA_DB_PASS
+              valueFrom: { secretKeyRef: { name: banka-pg-app, key: password } }
+            - name: DATABASE_READ_URL
+              value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-ro:5432/banka"
             - { name: REDIS_ADDR,       value: "redis:6379" }
             - { name: FX_FEED_INTERVAL, value: "5m" }
             - { name: FX_FEED_SPREAD,   value: "0.01" }
