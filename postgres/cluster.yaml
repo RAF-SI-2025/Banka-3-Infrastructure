@@ -7,18 +7,15 @@
 #   banka-pg-ro  → standbys only (round-robin, read-only, async-lagged)
 #   banka-pg-r   → any instance
 #
-# App-side routing lives in pkg/postgres: each service holds a *DB with
-# RW + RO pools; writes and tx default to -rw, opt-in reads marked with
-# postgres.WithRead(ctx) hit -ro. The auto-generated banka-pg-app secret
-# has user/password/dbname keys that the Deployment manifests compose
-# into DATABASE_READ_URL pointing at banka-pg-ro.
-#
-# No Pooler (PgBouncer) here. With instances=1 on the app side there's
-# no conn-pressure to relieve; PgBouncer in transaction mode forces a
-# pgx prepared-statement compatibility dance that isn't worth the
-# risk yet. Revisit when the cron-extraction lands and we HPA the
-# stateful services — at that point add CNPG Pooler resources fronting
-# both -rw and -ro and re-point DATABASE_URL / DATABASE_READ_URL.
+# Two CNPG Poolers (see poolers.yaml) sit in front of -rw and -ro:
+# banka-pg-pooler-rw and banka-pg-pooler-ro. Apps connect to those
+# pooler Services; the bare -rw/-ro cluster Services are reserved for
+# admin tooling and the migrate Job. App-side routing lives in
+# pkg/postgres: each service holds a *DB with RW + RO pools; writes
+# and tx default to -rw, opt-in reads marked with postgres.WithRead(ctx)
+# hit -ro. The Deployment manifests compose DATABASE_URL and
+# DATABASE_READ_URL from the banka-pg-app secret credentials, swapping
+# the host for each pooler endpoint.
 #
 # Major-version bump (16.4 → 18) is not in-place: CNPG's validating
 # webhook rejects mismatched postgresVersion against an existing PVC.

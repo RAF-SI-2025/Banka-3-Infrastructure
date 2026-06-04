@@ -50,18 +50,20 @@ spec:
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://alloy.alloy:4317" }
             - name: OTEL_SERVICE_NAME
               valueFrom: { fieldRef: { fieldPath: "metadata.labels['app.kubernetes.io/name']" } }
-            - name: DATABASE_URL
-              valueFrom: { secretKeyRef: { name: banka-pg-app, key: uri } }
-            # Read-replica DSN: same credentials, hostname swapped to
-            # banka-pg-ro (CNPG standby-only Service). pkg/postgres
-            # opens this as the RO pool; queries marked WithRead(ctx)
-            # land here. Skipped at runtime when empty.
+            # Both URLs target the CNPG Poolers (PgBouncer, transaction
+            # mode), not the bare cluster Services. pkg/postgres opens
+            # the RW pool against banka-pg-pooler-rw and the RO pool
+            # against banka-pg-pooler-ro; WithRead(ctx)-marked queries
+            # land on the read pool. Migrate Job stays on the bare
+            # banka-pg-rw via banka-pg-app.uri.
             - name: BANKA_DB_USER
               valueFrom: { secretKeyRef: { name: banka-pg-app, key: username } }
             - name: BANKA_DB_PASS
               valueFrom: { secretKeyRef: { name: banka-pg-app, key: password } }
+            - name: DATABASE_URL
+              value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-rw:5432/banka"
             - name: DATABASE_READ_URL
-              value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-ro:5432/banka"
+              value: "postgres://$(BANKA_DB_USER):$(BANKA_DB_PASS)@banka-pg-pooler-ro:5432/banka"
             - { name: REDIS_ADDR,             value: "redis:6379" }
             - { name: USER_GRPC_ADDR,         value: "user:50051" }
             - { name: EXCHANGE_GRPC_ADDR,     value: "exchange:50051" }

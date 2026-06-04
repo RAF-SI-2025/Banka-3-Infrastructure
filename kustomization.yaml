@@ -21,6 +21,7 @@ resources:
   - namespace.yaml
   - secrets.yaml
   - postgres/cluster.yaml
+  - postgres/poolers.yaml
   - redis/redis.yaml
   - migrate/job.yaml
   - services/user.yaml

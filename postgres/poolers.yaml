@@ -1,0 +1,61 @@
+# PgBouncer poolers in front of the CNPG cluster — one per direction.
+# Each Pooler kind reconciles into:
+#   * a Deployment of N PgBouncer pods
+#   * a Service of the same name as the Pooler (banka-pg-pooler-rw /
+#     banka-pg-pooler-ro) on port 5432
+#   * the auth_query plumbing so apps authenticate with the existing
+#     banka-pg-app credentials; no extra secret to manage
+#
+# type: rw  → upstream is the cluster's banka-pg-rw service (primary)
+# type: ro  → upstream is banka-pg-ro (standbys only, round-robin)
+#
+# Pool mode is transaction — modern default, lets a small bag of real
+# PG backends serve many app conns. Compatible with pgx's extended-
+# protocol prepared statements via max_prepared_statements > 0
+# (PgBouncer 1.21+, shipped by CNPG 1.29). Session-scoped state
+# (SET, LISTEN, session advisory locks) is unsafe in transaction
+# mode; the app codebase doesn't use any.
+#
+# Sync wave -4: after the Cluster (-5) reports healthy, before the
+# migrate Job (0) needs the DB up. Note migrate Job still targets the
+# cluster's banka-pg-rw service directly via banka-pg-app.uri — DDL
+# doesn't benefit from pooling and we don't want a fresh standby
+# cloning while migrations are mid-run.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: banka-pg-pooler-rw
+  namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  cluster:
+    name: banka-pg
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "25"
+      max_prepared_statements: "100"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: banka-pg-pooler-ro
+  namespace: raf-banka
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  cluster:
+    name: banka-pg
+  instances: 2
+  type: ro
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "25"
+      max_prepared_statements: "100"
