@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: trading
-          image: registry.urosevicvuk.dev/raf-banka3/trading:v1.1.0
+          image: registry.urosevicvuk.dev/raf-banka3/trading:v0.3.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

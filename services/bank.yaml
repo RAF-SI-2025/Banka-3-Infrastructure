@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: bank
-          image: registry.urosevicvuk.dev/raf-banka3/bank:v1.1.0
+          image: registry.urosevicvuk.dev/raf-banka3/bank:v0.3.0
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
