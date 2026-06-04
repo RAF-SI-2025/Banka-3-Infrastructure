@@ -1,34 +1,46 @@
-# Regular Sync resource at wave 0. Walks every service's migrations dir
-# in dependency order (user → exchange → bank → notification → trading)
-# and applies pending migrations against the banka DB. Each run is
-# idempotent — golang-migrate skips already-applied versions per schema.
+# Argo Sync hook that walks every service's migrations dir in
+# dependency order (user → exchange → bank → notification → trading)
+# and applies pending migrations against the banka DB. Idempotent —
+# golang-migrate skips already-applied versions per schema.
 #
-# Was originally a PreSync hook but that race-condition'd: PreSync runs
-# BEFORE the Sync phase, so harbor-pull (ESO) and banka-pg-app (CNPG)
-# don't exist yet → ImagePullBackOff + no DATABASE_URL. As a regular
-# Sync resource at wave 0, Argo runs us only after wave -10 (ESOs) and
-# wave -5 (CNPG cluster + Redis) report Healthy.
+# # Why a hook, not a regular Sync resource
 #
-# `ttlSecondsAfterFinished` cleans up the completed Pod after 10 min.
-# We deliberately don't set Argo's `Replace=true` sync option — it
-# conflicts with the AppSet-level `ServerSideApply=true` (kubectl rejects
-# `--server-side --force` together). If you ever change the Job spec,
-# manually `kubectl delete job -n raf-banka banka-migrate` once before
-# re-syncing; the new Job materializes fresh.
+# k8s Job spec is immutable on most fields (pod template, containers,
+# image, env). When you bump the migrate image tag, a regular Sync
+# resource hits "field is immutable" on apply, Argo flips Degraded,
+# and you have to `kubectl delete job` by hand before the next sync.
 #
-# The image baked at build time contains:
+# Annotating as `hook: Sync` + `hook-delete-policy: BeforeHookCreation`
+# tells Argo to delete the previous Job before applying the new one
+# on every sync — no more immutable-field rejections.
+#
+# `Sync` is critical here, not `PreSync`. PreSync runs BEFORE the
+# Sync phase, so wave-flagged dependencies (harbor-pull from ESO,
+# banka-pg-app from CNPG) don't exist yet at PreSync time → the Job
+# pod fails on ImagePullBackOff + missing DATABASE_URL. `Sync` hooks
+# run as part of the Sync phase and honor sync-wave normally — wave 0
+# still runs after wave -10 (ESOs) and wave -5 (CNPG + Redis).
+#
+# `ttlSecondsAfterFinished: 600` cleans the completed pod after 10
+# min. We don't need `hook-delete-policy: HookSucceeded` — the next
+# sync deletes via BeforeHookCreation anyway, and the TTL keeps the
+# namespace tidy between syncs.
+#
+# # The image
+#
+# Built by Banka-3-Backend/.github/workflows/build.yml from
+# docker/Dockerfile.migrate. Contains:
 #   /usr/local/bin/migrate
 #   /migrations/<svc>/*.sql
 #   /usr/local/bin/run-migrations.sh   (loops the 5 services)
-#
-# Image is produced by Banka-3-Backend/.github/workflows/build.yml from
-# docker/Dockerfile.migrate.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: banka-migrate
   namespace: raf-banka
   annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
     argocd.argoproj.io/sync-wave: "0"
 spec:
   backoffLimit: 3
