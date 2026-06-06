@@ -81,11 +81,11 @@ spec:
             # Celina 5 — outbound inter-bank. trading (NOT the gateway) reads
             # INTERBANK_ROUTES; the gateway only needs INTERBANK_API_KEY for
             # the inbound surface. INTERBANK_ROUTES base is the partner ROOT —
-            # our client appends /interbank/... itself. Left empty until
-            # Banka-4 gives their real interbank-service URL; then set:
-            #   "444:https://<banka4-interbank-root>"
+            # our client appends /interbank/... itself. Banka-4's interbank
+            # service is plain HTTP on :8083 (no TLS). NOTE: outbound calls
+            # will 401 until Banka-4 registers us (routing 333) as a peer.
             - { name: BANK_ROUTING_NUMBER,        value: "333" }
-            - { name: INTERBANK_ROUTES,           value: "" }
+            - { name: INTERBANK_ROUTES,           value: "444:http://rafsi.davidovic.io:8083" }
             - name: INTERBANK_API_KEY
               valueFrom: { secretKeyRef: { name: banka-interbank, key: api-key } }
             - name: ALPHAVANTAGE_API_KEY
