@@ -109,7 +109,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "gridPos": {"h": 14, "w": 24, "x": 0, "y": 16},
       "id": 20,
-      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "enableInfiniteScrolling": true, "dedupStrategy": "none", "sortOrder": "Descending"},
       "targets": [{"expr": "{namespace=\"raf-banka\",app=~\"$service\"} | detected_level=~\"warn|error|critical|fatal\" |~ \"(?i)$search\"", "refId": "A"}]
     },
 
@@ -121,7 +121,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "gridPos": {"h": 16, "w": 24, "x": 0, "y": 31},
       "id": 30,
-      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "enableInfiniteScrolling": true, "dedupStrategy": "none", "sortOrder": "Descending"},
       "targets": [{"expr": "{namespace=\"raf-banka\",app=~\"$service\"} |~ \"(?i)$search\"", "refId": "A", "maxLines": 1000}]
     },
 
@@ -132,12 +132,12 @@
         "datasource": {"type": "loki", "uid": "loki"},
         "gridPos": {"h": 12, "w": 24, "x": 0, "y": 48},
         "id": 40,
-        "options": {"showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+        "options": {"showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "enableInfiniteScrolling": true, "dedupStrategy": "none", "sortOrder": "Descending"},
         "targets": [{"expr": "{job=\"loki.source.kubernetes_events\"} |~ \"raf-banka\"", "refId": "A"}]
       }
     ]}
   ],
-  "refresh": "30s",
+  "refresh": "",
   "schemaVersion": 39,
   "style": "dark",
   "time": {"from": "now-1h", "to": "now"},
