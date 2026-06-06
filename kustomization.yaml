@@ -120,3 +120,17 @@ configMapGenerator:
         grafana_dashboard: "1"
         app.kubernetes.io/part-of: banka-3
       disableNameSuffixHash: true
+  # Community CNPG dashboard — pulled from
+  # github.com/cloudnative-pg/grafana-dashboards (charts/cluster/
+  # grafana-dashboard.json). DS_PROMETHEUS template variable was
+  # stripped and replaced with our actual UID `prometheus` at
+  # import time so it works under provisioning. Re-grab + re-apply
+  # the same sed/jq treatment if the upstream version is updated.
+  - name: banka-cnpg-dashboard
+    files:
+      - monitoring/dashboards/cnpg-cluster.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true

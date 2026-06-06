@@ -365,6 +365,95 @@
       "targets": [
         {"expr": "go_goroutines{job=~\"$service\"}", "legendFormat": "{{job}} {{pod}}", "refId": "A"}
       ]
+    },
+
+    {
+      "type": "row",
+      "title": "Autoscaling (HPA)",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 52},
+      "id": 105,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "Replicas — current vs min/max",
+      "description": "Bar = current_replicas. Yellow band = below min (scaled-down past floor — should never happen). Green = inside [min, max]. Red = at the ceiling, scaling exhausted.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 53},
+      "id": 50,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 6,
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "yellow", "value": null},
+            {"color": "green", "value": 1},
+            {"color": "orange", "value": 5},
+            {"color": "red", "value": 6}
+          ]}
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {"calcs": ["lastNotNull"]}
+      },
+      "targets": [
+        {"expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "legendFormat": "{{horizontalpodautoscaler}}", "refId": "A"}
+      ]
+    },
+    {
+      "type": "table",
+      "title": "HPA detail",
+      "description": "Current vs min/max with utilization. `% of max` = current/max; close to 100% means you're about to be capacity-constrained.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 53},
+      "id": 51,
+      "options": {"showHeader": true, "sortBy": [{"displayName": "% of max", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "left"}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]},
+          {"matcher": {"id": "byName", "options": "% of max"}, "properties": [
+            {"id": "unit", "value": "percentunit"},
+            {"id": "custom.displayMode", "value": "gradient-gauge"},
+            {"id": "custom.cellOptions", "value": {"type": "gauge", "mode": "gradient"}},
+            {"id": "max", "value": 1}, {"id": "min", "value": 0}
+          ]}
+        ]
+      },
+      "targets": [
+        {"expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "format": "table", "instant": true, "refId": "current"},
+        {"expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "format": "table", "instant": true, "refId": "desired"},
+        {"expr": "kube_horizontalpodautoscaler_spec_min_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "format": "table", "instant": true, "refId": "min"},
+        {"expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "format": "table", "instant": true, "refId": "max"},
+        {"expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"} / kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "format": "table", "instant": true, "refId": "util"}
+      ],
+      "transformations": [
+        {"id": "joinByField", "options": {"byField": "horizontalpodautoscaler", "mode": "outer"}},
+        {"id": "organize", "options": {
+          "excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true, "__name__ 4": true, "__name__ 5": true, "namespace 1": true, "namespace 2": true, "namespace 3": true, "namespace 4": true, "namespace 5": true, "container 1": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "endpoint 1": true, "endpoint 2": true, "endpoint 3": true, "endpoint 4": true, "endpoint 5": true, "instance 1": true, "instance 2": true, "instance 3": true, "instance 4": true, "instance 5": true, "job 1": true, "job 2": true, "job 3": true, "job 4": true, "job 5": true, "service 1": true, "service 2": true, "service 3": true, "service 4": true, "service 5": true},
+          "renameByName": {"horizontalpodautoscaler": "HPA", "Value #current": "current", "Value #desired": "desired", "Value #min": "min", "Value #max": "max", "Value #util": "% of max"}
+        }}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Replica count over time",
+      "description": "Watch this during traffic spikes. A flat line at max = HPA exhausted; bump the HPA's max if you're seeing this often. Big sawteeth = HPA flapping, tune the scale-down stabilization.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 63},
+      "id": 52,
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"lineInterpolation": "stepAfter", "fillOpacity": 10, "lineWidth": 2}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["min","max","lastNotNull"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"raf-banka\",horizontalpodautoscaler=~\"$service\"}", "legendFormat": "{{horizontalpodautoscaler}}", "refId": "A"}
+      ]
     }
   ],
   "refresh": "30s",

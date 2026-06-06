@@ -40,7 +40,7 @@
       "id": 1,
       "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
-      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"}[$__rate_interval]))", "refId": "A"}]
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"}[5m]))", "refId": "A"}]
     },
     {
       "type": "stat",
@@ -50,7 +50,7 @@
       "id": 2,
       "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.05}, {"color": "red", "value": 1}]}}},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area", "textMode": "auto"},
-      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=~\"error|critical|fatal\" [$__rate_interval]))", "refId": "A"}]
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=~\"error|critical|fatal\" [5m]))", "refId": "A"}]
     },
     {
       "type": "stat",
@@ -60,7 +60,7 @@
       "id": 3,
       "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.5}]}}},
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area", "textMode": "auto"},
-      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=\"warn\" [$__rate_interval]))", "refId": "A"}]
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=\"warn\" [5m]))", "refId": "A"}]
     },
     {
       "type": "stat",
@@ -81,7 +81,7 @@
       "id": 10,
       "fieldConfig": {"defaults": {"unit": "logs", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
       "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"expr": "sum by (app) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__rate_interval]))", "legendFormat": "{{app}}", "refId": "A"}]
+      "targets": [{"expr": "sum by (app) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__auto]))", "legendFormat": "{{app}}", "refId": "A"}]
     },
     {
       "type": "timeseries",
@@ -99,7 +99,7 @@
         ]
       },
       "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"expr": "sum by (detected_level) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__rate_interval]))", "legendFormat": "{{detected_level}}", "refId": "A"}]
+      "targets": [{"expr": "sum by (detected_level) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__auto]))", "legendFormat": "{{detected_level}}", "refId": "A"}]
     },
 
     {"type": "row", "title": "Errors", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15}, "id": 101, "collapsed": false, "panels": []},
