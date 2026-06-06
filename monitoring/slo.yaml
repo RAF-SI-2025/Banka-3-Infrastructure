@@ -91,9 +91,9 @@ spec:
       sli:
         events:
           errorQuery: |
-            sum(rate(rpc_server_duration_seconds_count{job=~"user|bank|trading|exchange|notification",rpc_grpc_status_code!="0"}[{{.window}}]))
+            sum(rate(rpc_server_duration_milliseconds_count{job=~"user|bank|trading|exchange|notification",rpc_grpc_status_code!="0"}[{{.window}}]))
           totalQuery: |
-            sum(rate(rpc_server_duration_seconds_count{job=~"user|bank|trading|exchange|notification"}[{{.window}}]))
+            sum(rate(rpc_server_duration_milliseconds_count{job=~"user|bank|trading|exchange|notification"}[{{.window}}]))
       alerting:
         name: InternalRPCAvailabilityBudgetBurn
         labels:

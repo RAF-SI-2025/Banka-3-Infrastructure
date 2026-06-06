@@ -1,0 +1,228 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "datasource", "uid": "grafana"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "description": "Gateway HTTP deep-dive: status codes, per-route latency, top routes, request/response sizes. otelhttp-instrumented.",
+  "editable": true,
+  "graphTooltip": 1,
+  "tags": ["banka", "gateway", "http"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(http_server_request_duration_seconds_count{job=\"gateway\"}, http_request_method)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "method",
+        "query": {"query": "label_values(http_server_request_duration_seconds_count{job=\"gateway\"}, http_request_method)", "refId": "StandardVariableQuery"},
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {"selected": false, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\"}, http_route)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "route",
+        "query": {"query": "label_values(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\"}, http_route)", "refId": "StandardVariableQuery"},
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {"selected": false, "text": "5m", "value": "5m"},
+        "hide": 0,
+        "name": "rate_window",
+        "options": [
+          {"selected": false, "text": "1m", "value": "1m"},
+          {"selected": true,  "text": "5m", "value": "5m"},
+          {"selected": false, "text": "15m", "value": "15m"},
+          {"selected": false, "text": "1h", "value": "1h"}
+        ],
+        "query": "1m,5m,15m,1h",
+        "type": "custom"
+      }
+    ]
+  },
+  "panels": [
+    {"type": "row", "title": "Top line", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "collapsed": false, "panels": []},
+    {
+      "type": "stat",
+      "title": "Requests/sec",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "5xx error ratio",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "fieldConfig": {"defaults": {"unit": "percent", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.5}, {"color": "red", "value": 5}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"},
+      "targets": [{"expr": "100 * sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"5..\"}[$rate_window])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])), 0.001)", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "4xx error ratio",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "fieldConfig": {"defaults": {"unit": "percent", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "orange", "value": 20}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"},
+      "targets": [{"expr": "100 * sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"4..\"}[$rate_window])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])), 0.001)", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "p95 latency",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.5}, {"color": "red", "value": 2}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "Status codes", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "id": 101, "collapsed": false, "panels": []},
+    {
+      "type": "timeseries",
+      "title": "Requests/sec by status code",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
+      "id": 10,
+      "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window]))", "legendFormat": "{{http_response_status_code}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests/sec by status class",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+      "id": 11,
+      "fieldConfig": {
+        "defaults": {"unit": "reqps", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "2xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "3xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]},
+          {"matcher": {"id": "byName", "options": "4xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]},
+          {"matcher": {"id": "byName", "options": "5xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"2..\"}[$rate_window]))", "legendFormat": "2xx", "refId": "A"},
+        {"expr": "sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"3..\"}[$rate_window]))", "legendFormat": "3xx", "refId": "B"},
+        {"expr": "sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"4..\"}[$rate_window]))", "legendFormat": "4xx", "refId": "C"},
+        {"expr": "sum(rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"5..\"}[$rate_window]))", "legendFormat": "5xx", "refId": "D"}
+      ]
+    },
+
+    {"type": "row", "title": "Latency", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15}, "id": 102, "collapsed": false, "panels": []},
+    {
+      "type": "timeseries",
+      "title": "Latency percentiles",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 16},
+      "id": 20,
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineInterpolation": "smooth", "fillOpacity": 5}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "type": "heatmap",
+      "title": "Latency heatmap",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 25},
+      "id": 21,
+      "options": {"calculate": false, "yAxis": {"unit": "s", "decimals": 2}, "color": {"mode": "scheme", "scheme": "Spectral", "steps": 64, "exponent": 0.5}, "cellGap": 0, "filterValues": {"le": 1e-9}, "tooltip": {"show": true, "yHistogram": false}, "legend": {"show": true}},
+      "targets": [{"expr": "sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window]))", "format": "heatmap", "legendFormat": "{{le}}", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "Routes", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 34}, "id": 103, "collapsed": false, "panels": []},
+    {
+      "type": "table",
+      "title": "Top routes by traffic",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 8, "x": 0, "y": 35},
+      "id": 30,
+      "options": {"showHeader": true, "sortBy": [{"displayName": "req/s", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"unit": "reqps", "custom": {"align": "left", "displayMode": "color-text"}, "color": {"mode": "continuous-BlPu"}},
+        "overrides": [{"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]}]
+      },
+      "targets": [{"expr": "topk(15, sum by (http_request_method, http_route) (rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"__name__": true, "Time": true}, "renameByName": {"Value": "req/s"}}}]
+    },
+    {
+      "type": "table",
+      "title": "Top routes by p99 latency",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 8, "x": 8, "y": 35},
+      "id": 31,
+      "options": {"showHeader": true, "sortBy": [{"displayName": "p99 (s)", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"unit": "s", "custom": {"align": "left", "displayMode": "color-text"}, "color": {"mode": "continuous-YlOrRd"}},
+        "overrides": [{"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]}]
+      },
+      "targets": [{"expr": "topk(15, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window]))))", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"__name__": true, "Time": true}, "renameByName": {"Value": "p99 (s)"}}}]
+    },
+    {
+      "type": "table",
+      "title": "Top routes by 5xx",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 8, "x": 16, "y": 35},
+      "id": 32,
+      "options": {"showHeader": true, "sortBy": [{"displayName": "5xx/s", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"unit": "reqps", "custom": {"align": "left", "displayMode": "color-text"}, "color": {"mode": "continuous-YlOrRd"}},
+        "overrides": [{"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]}]
+      },
+      "targets": [{"expr": "topk(15, sum by (http_request_method, http_route) (rate(http_server_request_duration_seconds_count{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\",http_response_status_code=~\"5..\"}[$rate_window])))", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"__name__": true, "Time": true}, "renameByName": {"Value": "5xx/s"}}}]
+    },
+
+    {"type": "row", "title": "Payload size", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 44}, "id": 104, "collapsed": true, "panels": [
+      {
+        "type": "timeseries",
+        "title": "Request body p95 size",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 45},
+        "id": 40,
+        "fieldConfig": {"defaults": {"unit": "bytes", "custom": {"lineInterpolation": "smooth", "fillOpacity": 10}}},
+        "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi"}},
+        "targets": [{"expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_body_size_bytes_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "legendFormat": "{{http_route}}", "refId": "A"}]
+      },
+      {
+        "type": "timeseries",
+        "title": "Response body p95 size",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 45},
+        "id": 41,
+        "fieldConfig": {"defaults": {"unit": "bytes", "custom": {"lineInterpolation": "smooth", "fillOpacity": 10}}},
+        "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi"}},
+        "targets": [{"expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_response_body_size_bytes_bucket{job=\"gateway\",http_request_method=~\"$method\",http_route=~\"$route\"}[$rate_window])))", "legendFormat": "{{http_route}}", "refId": "A"}]
+      }
+    ]}
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "browser",
+  "title": "Banka — Gateway HTTP",
+  "uid": "banka-gateway-http",
+  "version": 1
+}

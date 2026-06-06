@@ -1,0 +1,148 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "datasource", "uid": "grafana"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "description": "Banka-3 logs explorer — volume, levels, error stream, k8s events, free-text search. All series sourced from Loki via Alloy DaemonSet.",
+  "editable": true,
+  "graphTooltip": 1,
+  "tags": ["banka", "logs", "loki"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "All", "value": "$__all"},
+        "datasource": {"type": "loki", "uid": "loki"},
+        "definition": "label_values({namespace=\"raf-banka\"}, app)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "service",
+        "query": {"label": "app", "stream": "{namespace=\"raf-banka\"}", "type": 1, "refId": "LokiVariableQueryEditor-VariableQuery"},
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {"selected": false, "text": "", "value": ""},
+        "hide": 0,
+        "name": "search",
+        "label": "Free-text search",
+        "description": "Substring filtered with |~ (case-insensitive). Leave empty to disable.",
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "panels": [
+    {"type": "row", "title": "Volume", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "collapsed": false, "panels": []},
+    {
+      "type": "stat",
+      "title": "Lines/sec — total raf-banka",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"}[$__rate_interval]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Errors/sec",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.05}, {"color": "red", "value": 1}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=~\"error|critical|fatal\" [$__rate_interval]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Warnings/sec",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "fieldConfig": {"defaults": {"unit": "logs", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.5}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(rate({namespace=\"raf-banka\"} | detected_level=\"warn\" [$__rate_interval]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Streams active",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "none", "textMode": "auto"},
+      "targets": [{"expr": "count(count by (pod) (count_over_time({namespace=\"raf-banka\"}[$__range])))", "refId": "A"}]
+    },
+
+    {
+      "type": "timeseries",
+      "title": "Log volume by service",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 6},
+      "id": 10,
+      "fieldConfig": {"defaults": {"unit": "logs", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (app) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__rate_interval]))", "legendFormat": "{{app}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Log volume by level",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 6},
+      "id": 11,
+      "fieldConfig": {
+        "defaults": {"unit": "logs", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "error"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "warn"},  "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "info"},  "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "debug"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (detected_level) (rate({namespace=\"raf-banka\",app=~\"$service\"}[$__rate_interval]))", "legendFormat": "{{detected_level}}", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "Errors", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 15}, "id": 101, "collapsed": false, "panels": []},
+    {
+      "type": "logs",
+      "title": "Error & warning log stream",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 14, "w": 24, "x": 0, "y": 16},
+      "id": 20,
+      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+      "targets": [{"expr": "{namespace=\"raf-banka\",app=~\"$service\"} | detected_level=~\"warn|error|critical|fatal\" |~ \"(?i)$search\"", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "All logs (filtered)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30}, "id": 102, "collapsed": false, "panels": []},
+    {
+      "type": "logs",
+      "title": "All raf-banka logs — text-search filtered",
+      "description": "Use the $search textbox above to grep. Empty $search matches everything.",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 16, "w": 24, "x": 0, "y": 31},
+      "id": 30,
+      "options": {"showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+      "targets": [{"expr": "{namespace=\"raf-banka\",app=~\"$service\"} |~ \"(?i)$search\"", "refId": "A", "maxLines": 1000}]
+    },
+
+    {"type": "row", "title": "Kubernetes events", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 47}, "id": 103, "collapsed": true, "panels": [
+      {
+        "type": "logs",
+        "title": "Cluster events touching raf-banka",
+        "datasource": {"type": "loki", "uid": "loki"},
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 48},
+        "id": 40,
+        "options": {"showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending"},
+        "targets": [{"expr": "{job=\"loki.source.kubernetes_events\"} |~ \"raf-banka\"", "refId": "A"}]
+      }
+    ]}
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "browser",
+  "title": "Banka — Logs (Loki)",
+  "uid": "banka-logs",
+  "version": 1
+}

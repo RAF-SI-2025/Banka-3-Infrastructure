@@ -42,11 +42,48 @@ resources:
 # Grafana sidecar discovers dashboards by the grafana_dashboard label
 # across all namespaces by default. disableNameSuffixHash keeps the CM
 # name stable so dashboard updates don't churn a new resource each sync.
+# One CM per dashboard so an edit to one only churns its own resource.
 configMapGenerator:
   - name: banka-overview-dashboard
     namespace: raf-banka
     files:
       - monitoring/dashboards/banka-overview.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true
+  - name: banka-services-red-dashboard
+    namespace: raf-banka
+    files:
+      - monitoring/dashboards/services-red.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true
+  - name: banka-gateway-http-dashboard
+    namespace: raf-banka
+    files:
+      - monitoring/dashboards/gateway-http.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true
+  - name: banka-logs-dashboard
+    namespace: raf-banka
+    files:
+      - monitoring/dashboards/logs.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: banka-3
+      disableNameSuffixHash: true
+  - name: banka-business-dashboard
+    namespace: raf-banka
+    files:
+      - monitoring/dashboards/business.json
     options:
       labels:
         grafana_dashboard: "1"

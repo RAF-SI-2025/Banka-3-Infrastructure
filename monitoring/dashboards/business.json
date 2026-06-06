@@ -1,0 +1,189 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "datasource", "uid": "grafana"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "description": "Business KPIs for Banka-3: payments, trades, user activity. Counters live in the Go services (pkg/bizmetric).",
+  "editable": true,
+  "graphTooltip": 1,
+  "tags": ["banka", "business"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "5m", "value": "5m"},
+        "hide": 0,
+        "name": "rate_window",
+        "options": [
+          {"selected": false, "text": "1m", "value": "1m"},
+          {"selected": true,  "text": "5m", "value": "5m"},
+          {"selected": false, "text": "15m", "value": "15m"},
+          {"selected": false, "text": "1h", "value": "1h"}
+        ],
+        "query": "1m,5m,15m,1h",
+        "type": "custom"
+      }
+    ]
+  },
+  "panels": [
+    {"type": "row", "title": "Today at a glance", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "collapsed": false, "panels": []},
+    {
+      "type": "stat",
+      "title": "Payments today (success)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(banka_payments_total{status=\"ok\"}[24h]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Trades today",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(banka_trades_total{status=\"ok\"}[24h]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Logins today (success)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area", "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(banka_user_logins_total{result=\"ok\"}[24h]))", "refId": "A"}]
+    },
+    {
+      "type": "stat",
+      "title": "Login success rate",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "fieldConfig": {"defaults": {"unit": "percent", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 80}, {"color": "green", "value": 95}]}}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none", "textMode": "auto"},
+      "targets": [{"expr": "100 * sum(rate(banka_user_logins_total{result=\"ok\"}[$rate_window])) / clamp_min(sum(rate(banka_user_logins_total[$rate_window])), 0.001)", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "Payments", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "id": 101, "collapsed": false, "panels": []},
+    {
+      "type": "timeseries",
+      "title": "Payments per second by currency",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 7},
+      "id": 10,
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (currency) (rate(banka_payments_total{status=\"ok\"}[$rate_window]))", "legendFormat": "{{currency}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Payments per second by kind",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 7},
+      "id": 11,
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (kind) (rate(banka_payments_total{status=\"ok\"}[$rate_window]))", "legendFormat": "{{kind}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failed payments per second by reason",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 12,
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 15, "stacking": {"mode": "normal"}}, "color": {"mode": "continuous-YlOrRd"}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (status) (rate(banka_payments_total{status!=\"ok\"}[$rate_window]))", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "Trading", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24}, "id": 102, "collapsed": false, "panels": []},
+    {
+      "type": "timeseries",
+      "title": "Trades per second by side",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 25},
+      "id": 20,
+      "fieldConfig": {
+        "defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "buy"},  "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "sell"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (side) (rate(banka_trades_total{status=\"ok\"}[$rate_window]))", "legendFormat": "{{side}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Trades per second by security type",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 25},
+      "id": 21,
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (security_type) (rate(banka_trades_total{status=\"ok\"}[$rate_window]))", "legendFormat": "{{security_type}}", "refId": "A"}]
+    },
+    {
+      "type": "table",
+      "title": "Cumulative trades (24h) — top by side+type",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 34},
+      "id": 22,
+      "options": {"showHeader": true, "sortBy": [{"displayName": "Value", "desc": true}]},
+      "fieldConfig": {
+        "defaults": {"unit": "none", "decimals": 0, "custom": {"align": "left", "displayMode": "color-text"}, "color": {"mode": "continuous-BlPu"}},
+        "overrides": [{"matcher": {"id": "byName", "options": "Time"}, "properties": [{"id": "custom.hidden", "value": true}]}]
+      },
+      "targets": [{"expr": "topk(15, sum by (side, security_type) (increase(banka_trades_total{status=\"ok\"}[24h])))", "format": "table", "instant": true, "refId": "A"}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"__name__": true, "Time": true}, "renameByName": {"Value": "trades (24h)"}}}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failed trades per second",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 34},
+      "id": 23,
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 15, "stacking": {"mode": "normal"}}, "color": {"mode": "continuous-YlOrRd"}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (status) (rate(banka_trades_total{status!=\"ok\"}[$rate_window]))", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+
+    {"type": "row", "title": "User activity", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43}, "id": 103, "collapsed": false, "panels": []},
+    {
+      "type": "timeseries",
+      "title": "Logins per second by result",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 44},
+      "id": 30,
+      "fieldConfig": {
+        "defaults": {"unit": "ops", "custom": {"lineInterpolation": "smooth", "fillOpacity": 25, "stacking": {"mode": "normal"}}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "ok"},          "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "bad_password"},"properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+          {"matcher": {"id": "byName", "options": "not_found"},   "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "disabled"},    "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}]}
+        ]
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (result) (rate(banka_user_logins_total[$rate_window]))", "legendFormat": "{{result}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cumulative logins (running) — last 24h",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 44},
+      "id": 31,
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"lineInterpolation": "smooth", "fillOpacity": 10}}},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull","max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (result) (increase(banka_user_logins_total[24h]))", "legendFormat": "{{result}}", "refId": "A"}]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Banka — Business",
+  "uid": "banka-business",
+  "version": 1
+}

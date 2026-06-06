@@ -57,7 +57,7 @@
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "sum by (job, rpc_grpc_status_code) (rate(rpc_server_duration_seconds_count{job=~\"user|bank|trading|exchange|notification\"}[5m]))",
+          "expr": "sum by (job, rpc_grpc_status_code) (rate(rpc_server_duration_milliseconds_count{job=~\"user|bank|trading|exchange|notification\"}[5m]))",
           "legendFormat": "{{job}} code={{rpc_grpc_status_code}}",
           "refId": "A"
         }
@@ -72,7 +72,7 @@
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}},
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (le, job, rpc_service, rpc_method) (rate(rpc_server_duration_seconds_bucket{job=~\"user|bank|trading|exchange|notification\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le, job, rpc_service, rpc_method) (rate(rpc_server_duration_milliseconds_bucket{job=~\"user|bank|trading|exchange|notification\"}[5m]))) / 1000",
           "legendFormat": "p99 {{job}} {{rpc_service}}/{{rpc_method}}",
           "refId": "A"
         }
