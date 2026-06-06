@@ -1,9 +1,14 @@
 # Single public hostname.
-#   /api/*  → gateway:8080  (HTTP/JSON ↔ gRPC bridge)
-#   /*      → frontend:8080 (Vite SPA via nginx)
+#   /api/*        → gateway:8080  (HTTP/JSON ↔ gRPC bridge)
+#   /interbank/*  → gateway:8080  (celina-5 partner-facing inbound surface)
+#   /*            → frontend:8080 (Vite SPA via nginx)
 #
-# Path-prefix matching evaluates longest-prefix first, so /api/* wins
-# over /. cert-manager + external-dns + cloudflared on gateway-external
+# The partner inbound surface (2PC envelope + OTC) is served by the gateway
+# under /interbank, NOT under /api — without its own rule it falls through to
+# the SPA and partner banks (e.g. Banka-4) get HTML instead of the bank.
+#
+# Path-prefix matching evaluates longest-prefix first, so /api/* and
+# /interbank/* win over /. cert-manager + external-dns + cloudflared on gateway-external
 # handle TLS + DNS + tunnel. DNS record for banka.raf-project.com must
 # point at the cloudflared tunnel (manual one-time step).
 apiVersion: gateway.networking.k8s.io/v1
@@ -22,6 +27,9 @@ spec:
         - path:
             type: PathPrefix
             value: /api
+        - path:
+            type: PathPrefix
+            value: /interbank
       backendRefs:
         - name: gateway
           port: 8080
