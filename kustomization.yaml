@@ -1,20 +1,15 @@
-# Banka-3 base manifests, env-agnostic.
+# Banka-3 manifests, flat layout.
 #
-# Picked up by overlays/{prod,dev}. Each overlay supplies the
-# Namespace + ExternalSecrets + HTTPRoute (those three carry env-
-# specific values — namespace name, Vault path prefix, public
-# hostname) and pins image tags. Everything else is identical across
-# environments.
+# Single environment (prod). Namespace, ExternalSecrets, HTTPRoute and
+# image tags all live here at the root — no base/overlays split.
 #
-# The `namespace:` directive is intentionally absent; every overlay
-# sets its own so a build of base alone is a no-op (no target
-# namespace = kustomize refuses to render Deployments without an
-# explicit metadata.namespace). The hardcoded `namespace: raf-banka`
-# values inside individual resource files are kept for editor jump-
-# to-resource ergonomics — overlays' top-level `namespace:` rewrites
-# them at build time.
+# The hardcoded `namespace: raf-banka` values inside individual resource
+# files are kept for editor jump-to-resource ergonomics; the top-level
+# `namespace:` below rewrites them at build time anyway.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: raf-banka
 
 # Propagate part-of onto every resource (and crucially, every pod template)
 # so the PodMonitor in monitoring/podmonitor.yaml can select all banka pods
@@ -30,6 +25,9 @@ labels:
     includeSelectors: false
 
 resources:
+  - namespace.yaml
+  - secrets.yaml
+  - httproute.yaml
   - postgres/cluster.yaml
   - postgres/poolers.yaml
   - redis/redis.yaml
@@ -42,18 +40,45 @@ resources:
   - services/gateway.yaml
   - services/scheduler.yaml
   - frontend/frontend.yaml
-  - hpas.yaml
   - monitoring/podmonitor.yaml
   - monitoring/prometheusrule.yaml
   - monitoring/alertmanagerconfig.yaml
   - monitoring/slo.yaml
 
+# Tag everything for the current release. Bump in one place when cutting
+# a new release. The 6 Go services share generated proto contracts so
+# they ship in lockstep — kustomize's `images:` does the swap by image
+# name, not by file edit, so a future tag bump only touches this block.
+# `migrate` and `frontend` are independent build artifacts but we tag
+# them at the same release for the same reason (atomic releases).
+images:
+  - name: registry.urosevicvuk.dev/raf-banka3/user
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/bank
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/trading
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/exchange
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/notification
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/gateway
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/scheduler
+    newTag: v0.3.5
+  - name: registry.urosevicvuk.dev/raf-banka3/migrate
+    newTag: v0.3.5
+  # Frontend trails backend by intent — it doesn't share the proto
+  # contracts, so its release cadence is independent. Bump when the FE
+  # gets a deploy-worthy change. Mirror to the backend tag during the
+  # next release to converge.
+  - name: registry.urosevicvuk.dev/raf-banka3/frontend
+    newTag: v0.3.0
+
 # Grafana sidecar discovers dashboards by the grafana_dashboard label
 # across all namespaces by default. disableNameSuffixHash keeps the CM
 # name stable so dashboard updates don't churn a new resource each sync.
 # One CM per dashboard so an edit to one only churns its own resource.
-# Namespace is intentionally omitted from each entry — the overlay's
-# top-level `namespace:` directive places them in the right namespace.
 configMapGenerator:
   - name: banka-overview-dashboard
     files:
