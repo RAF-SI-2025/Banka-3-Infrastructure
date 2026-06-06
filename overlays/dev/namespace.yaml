@@ -1,0 +1,13 @@
+# raf-banka-dev namespace — auto-deploys main on every push.
+#
+# Same tenant guardrails posture as prod (currently permissive, see
+# base/postgres/cluster.yaml comments). Tenant label stays `raf` so
+# the cluster Alertmanager + Loki tenant queries still scope correctly.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: raf-banka-dev
+  labels:
+    app.kubernetes.io/part-of: banka-3
+    tenant: raf
+    environment: dev

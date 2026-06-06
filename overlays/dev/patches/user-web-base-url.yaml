@@ -1,0 +1,15 @@
+# Override WEB_BASE_URL so activation/reset emails link at the dev
+# host instead of prod. The strategic merge replaces just the one env
+# entry — kustomize matches by `name` and overwrites `value`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+spec:
+  template:
+    spec:
+      containers:
+        - name: user
+          env:
+            - name: WEB_BASE_URL
+              value: https://bankadev.raf-project.com

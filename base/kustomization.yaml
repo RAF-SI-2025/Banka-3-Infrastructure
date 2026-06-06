@@ -1,8 +1,20 @@
-# Banka-3 deployment root.
+# Banka-3 base manifests, env-agnostic.
+#
+# Picked up by overlays/{prod,dev}. Each overlay supplies the
+# Namespace + ExternalSecrets + HTTPRoute (those three carry env-
+# specific values — namespace name, Vault path prefix, public
+# hostname) and pins image tags. Everything else is identical across
+# environments.
+#
+# The `namespace:` directive is intentionally absent; every overlay
+# sets its own so a build of base alone is a no-op (no target
+# namespace = kustomize refuses to render Deployments without an
+# explicit metadata.namespace). The hardcoded `namespace: raf-banka`
+# values inside individual resource files are kept for editor jump-
+# to-resource ergonomics — overlays' top-level `namespace:` rewrites
+# them at build time.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
-namespace: raf-banka
 
 # Propagate part-of onto every resource (and crucially, every pod template)
 # so the PodMonitor in monitoring/podmonitor.yaml can select all banka pods
@@ -18,8 +30,6 @@ labels:
     includeSelectors: false
 
 resources:
-  - namespace.yaml
-  - secrets.yaml
   - postgres/cluster.yaml
   - postgres/poolers.yaml
   - redis/redis.yaml
@@ -32,7 +42,6 @@ resources:
   - services/gateway.yaml
   - services/scheduler.yaml
   - frontend/frontend.yaml
-  - httproute.yaml
   - hpas.yaml
   - monitoring/podmonitor.yaml
   - monitoring/prometheusrule.yaml
@@ -43,9 +52,10 @@ resources:
 # across all namespaces by default. disableNameSuffixHash keeps the CM
 # name stable so dashboard updates don't churn a new resource each sync.
 # One CM per dashboard so an edit to one only churns its own resource.
+# Namespace is intentionally omitted from each entry — the overlay's
+# top-level `namespace:` directive places them in the right namespace.
 configMapGenerator:
   - name: banka-overview-dashboard
-    namespace: raf-banka
     files:
       - monitoring/dashboards/banka-overview.json
     options:
@@ -54,7 +64,6 @@ configMapGenerator:
         app.kubernetes.io/part-of: banka-3
       disableNameSuffixHash: true
   - name: banka-services-red-dashboard
-    namespace: raf-banka
     files:
       - monitoring/dashboards/services-red.json
     options:
@@ -63,7 +72,6 @@ configMapGenerator:
         app.kubernetes.io/part-of: banka-3
       disableNameSuffixHash: true
   - name: banka-gateway-http-dashboard
-    namespace: raf-banka
     files:
       - monitoring/dashboards/gateway-http.json
     options:
@@ -72,7 +80,6 @@ configMapGenerator:
         app.kubernetes.io/part-of: banka-3
       disableNameSuffixHash: true
   - name: banka-logs-dashboard
-    namespace: raf-banka
     files:
       - monitoring/dashboards/logs.json
     options:
@@ -81,7 +88,6 @@ configMapGenerator:
         app.kubernetes.io/part-of: banka-3
       disableNameSuffixHash: true
   - name: banka-business-dashboard
-    namespace: raf-banka
     files:
       - monitoring/dashboards/business.json
     options:
