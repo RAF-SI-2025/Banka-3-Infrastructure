@@ -95,7 +95,7 @@ spec:
             # celina-5 signature on OUTBOUND partner traffic. optional:
             # unset → outbound messages go unsigned (feature off).
             - name: INTERBANK_SIGN_KEY
-              valueFrom: { secretKeyRef: { name: banka-interbank, key: sign-key, optional: true } }
+              valueFrom: { secretKeyRef: { name: banka-interbank-sign, key: sign-key, optional: true } }
             - name: ALPHAVANTAGE_API_KEY
               valueFrom: { secretKeyRef: { name: banka-alphavantage, key: api-key, optional: true } }
           readinessProbe:

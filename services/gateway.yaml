@@ -66,7 +66,7 @@ spec:
             # celina-5 signature verification on INBOUND partner traffic.
             # optional: unset → unsigned traffic is accepted (feature off).
             - name: INTERBANK_SIGN_KEY
-              valueFrom: { secretKeyRef: { name: banka-interbank, key: sign-key, optional: true } }
+              valueFrom: { secretKeyRef: { name: banka-interbank-sign, key: sign-key, optional: true } }
           readinessProbe:
             httpGet: { path: /readyz, port: probe }
             periodSeconds: 5
