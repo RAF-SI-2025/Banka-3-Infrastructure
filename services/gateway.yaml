@@ -63,6 +63,10 @@ spec:
               valueFrom: { secretKeyRef: { name: banka-auth, key: jwt-signing-key } }
             - name: INTERBANK_API_KEY
               valueFrom: { secretKeyRef: { name: banka-interbank, key: api-key } }
+            # celina-5 signature verification on INBOUND partner traffic.
+            # optional: unset → unsigned traffic is accepted (feature off).
+            - name: INTERBANK_SIGN_KEY
+              valueFrom: { secretKeyRef: { name: banka-interbank-sign, key: sign-key, optional: true } }
           readinessProbe:
             httpGet: { path: /readyz, port: probe }
             periodSeconds: 5

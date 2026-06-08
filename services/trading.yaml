@@ -88,6 +88,14 @@ spec:
             - { name: INTERBANK_ROUTES,           value: "444:http://rafsi.davidovic.io:8083" }
             - name: INTERBANK_API_KEY
               valueFrom: { secretKeyRef: { name: banka-interbank, key: api-key } }
+            # Per-partner OUTBOUND keys ("code:key"). optional: unset →
+            # falls back to INTERBANK_API_KEY when calling partners.
+            - name: INTERBANK_PARTNER_KEYS
+              valueFrom: { secretKeyRef: { name: banka-interbank, key: partner-keys, optional: true } }
+            # celina-5 signature on OUTBOUND partner traffic. optional:
+            # unset → outbound messages go unsigned (feature off).
+            - name: INTERBANK_SIGN_KEY
+              valueFrom: { secretKeyRef: { name: banka-interbank-sign, key: sign-key, optional: true } }
             - name: ALPHAVANTAGE_API_KEY
               valueFrom: { secretKeyRef: { name: banka-alphavantage, key: api-key, optional: true } }
           readinessProbe:
