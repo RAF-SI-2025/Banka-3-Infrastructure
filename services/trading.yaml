@@ -72,6 +72,7 @@ spec:
             - { name: BANK_GRPC_ADDR,             value: "bank:50051" }
             - { name: EXCHANGE_GRPC_ADDR,         value: "exchange:50051" }
             - { name: NOTIFICATION_GRPC_ADDR,     value: "notification:50051" }
+            - { name: USER_GRPC_ADDR,             value: "user:50051" }
             - { name: EXECUTION_TICK_INTERVAL,    value: "10s" }
             - { name: MARKET_DATA_REFRESH_INTERVAL, value: "6h" }
             - { name: MARKET_DATA_PAUSE,          value: "13s" }
