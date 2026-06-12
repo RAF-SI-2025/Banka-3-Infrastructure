@@ -53,27 +53,27 @@ resources:
 # them at the same release for the same reason (atomic releases).
 images:
   - name: registry.urosevicvuk.dev/raf-banka3/user
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/bank
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/trading
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/exchange
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/notification
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/gateway
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/scheduler
-    newTag: v0.6.2
+    newTag: v0.6.3
   - name: registry.urosevicvuk.dev/raf-banka3/migrate
-    newTag: v0.6.2
+    newTag: v0.6.3
   # Frontend trails backend by intent — it doesn't share the proto
   # contracts, so its release cadence is independent. Bump when the FE
   # gets a deploy-worthy change. Mirror to the backend tag during the
   # next release to converge.
   - name: registry.urosevicvuk.dev/raf-banka3/frontend
-    newTag: v0.6.0
+    newTag: v0.6.3
 
 # Grafana sidecar discovers dashboards by the grafana_dashboard label
 # across all namespaces by default. disableNameSuffixHash keeps the CM
