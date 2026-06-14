@@ -73,7 +73,7 @@ images:
   # gets a deploy-worthy change. Mirror to the backend tag during the
   # next release to converge.
   - name: registry.urosevicvuk.dev/raf-banka3/frontend
-    newTag: v0.6.3
+    newTag: v0.6.4
 
 # Grafana sidecar discovers dashboards by the grafana_dashboard label
 # across all namespaces by default. disableNameSuffixHash keeps the CM
