@@ -1,16 +1,25 @@
 # Single public hostname.
-#   /api/*        → gateway:8080  (HTTP/JSON ↔ gRPC bridge)
-#   /interbank/*  → gateway:8080  (celina-5 partner-facing inbound surface)
-#   /*            → frontend:8080 (Vite SPA via nginx)
+#   /api/*          → gateway:8080  (HTTP/JSON ↔ gRPC bridge)
+#   /interbank/*    → gateway:8080  (celina-5 partner-facing inbound surface)
+#   /public-stock   → gateway:8080  (canonical si-tx-proto OTC discovery, §3.1)
+#   /negotiations/* → gateway:8080  (canonical si-tx-proto OTC negotiation, §3.2-3.6)
+#   /*              → frontend:8080 (Vite SPA via nginx)
 #
 # The partner inbound surface (2PC envelope + OTC) is served by the gateway
 # under /interbank, NOT under /api — without its own rule it falls through to
 # the SPA and partner banks (e.g. Banka-4) get HTML instead of the bank.
 #
-# Path-prefix matching evaluates longest-prefix first, so /api/* and
-# /interbank/* win over /. cert-manager + external-dns + cloudflared on gateway-external
-# handle TLS + DNS + tunnel. DNS record for banka.raf-project.com must
-# point at the cloudflared tunnel (manual one-time step).
+# Banka-2 uses the canonical si-tx-proto layout: the 2PC envelope goes to
+# {base}/interbank, but OTC discovery/negotiation hit BARE roots
+# ({base}/public-stock, {base}/negotiations). The gateway already serves both
+# the bare and /interbank-prefixed mounts; these two extra rules expose the
+# bare canonical paths so a partner on that layout sees our OTC offers instead
+# of SPA HTML. (Seller display-name lookup stays under /interbank/user.)
+#
+# Path-prefix matching evaluates longest-prefix first, so /api/*, /interbank/*,
+# /public-stock and /negotiations/* win over /. cert-manager + external-dns +
+# cloudflared on gateway-external handle TLS + DNS + tunnel. DNS record for
+# banka.raf-project.com must point at the cloudflared tunnel (manual one-time step).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -30,6 +39,12 @@ spec:
         - path:
             type: PathPrefix
             value: /interbank
+        - path:
+            type: PathPrefix
+            value: /public-stock
+        - path:
+            type: PathPrefix
+            value: /negotiations
       backendRefs:
         - name: gateway
           port: 8080
